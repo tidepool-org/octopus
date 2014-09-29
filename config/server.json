@@ -1,0 +1,18 @@
+{
+  "service": {
+    "service": "last-update-local",
+    "protocol": "http",
+    "host": "localhost:9988",
+    "keyFile": "config/key.pem",
+    "certFile": "config/cert.pem"
+  },
+  "mongo": {
+    "connectionString": "mongodb://localhost/user"
+  },
+  "gofish" : {
+    "serverSecret": "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy",
+    "apiSecret": "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
+    "longTermKey": "abcdefghijklmnopqrstuvwxyz",
+    "salt" : "ADihSEI7tOQQP9xfXMO9HfRpXKu1NpIJ"
+  }
+}
