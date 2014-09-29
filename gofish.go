@@ -4,12 +4,14 @@ import (
 	//"./api"
 	//sc "./clients"
 	//"github.com/gorilla/mux"
+	"crypto/tls"
 	"github.com/gorilla/pat"
 	"github.com/tidepool-org/go-common"
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
-	//"github.com/tidepool-org/go-common/clients/hakken"
+	"github.com/tidepool-org/go-common/clients/hakken"
 	"github.com/tidepool-org/go-common/clients/mongo"
+	"github.com/tidepool-org/go-common/clients/shoreline"
 	"log"
 	"net/http"
 	"os"
@@ -33,17 +35,22 @@ func main() {
 		log.Panic("Problem loading config", err)
 	}
 
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	httpClient := &http.Client{Transport: tr}
+
 	/*
 	 * Hakken setup
 	 */
-	//hakkenClient := hakken.NewHakkenBuilder().
-	//	WithConfig(&config.HakkenConfig).
-	//	Build()
+	hakkenClient := hakken.NewHakkenBuilder().
+		WithConfig(&config.HakkenConfig).
+		Build()
 
-	//if err := hakkenClient.Start(); err != nil {
-	//	log.Fatal(err)
-	//}
-	//defer hakkenClient.Close()
+	if err := hakkenClient.Start(); err != nil {
+		log.Fatal(err)
+	}
+	defer hakkenClient.Close()
 
 	/*
 	 * Shoreline setup
@@ -57,6 +64,37 @@ func main() {
 	/*
 	 * Serve it up and publish
 	 */
+
+	shorelineClient := shoreline.NewShorelineClientBuilder().
+		WithHostGetter(config.ShorelineConfig.ToHostGetter(hakkenClient)).
+		WithHttpClient(httpClient).
+		WithConfig(&config.ShorelineConfig.ShorelineClientConfig).
+		Build()
+
+	gatekeeperClient := clients.NewGatekeeperClientBuilder().
+		WithHostGetter(config.GatekeeperConfig.ToHostGetter(hakkenClient)).
+		WithHttpClient(httpClient).
+		WithTokenProvider(shorelineClient).
+		Build()
+
+	userCanViewData := func(userID, groupID string) bool {
+		if userID == groupID {
+			return true
+		}
+
+		perms, err := gatekeeperClient.UserInGroup(userID, groupID)
+		if err != nil {
+			log.Println("Error looking up user in group", err)
+			return false
+		}
+
+		log.Println(perms)
+		return !(perms["root"] == nil && perms["view"] == nil)
+	}
+
+	if err := shorelineClient.Start(); err != nil {
+		log.Fatal(err)
+	}
 
 	session, err := mongo.Connect(&config.Mongo)
 	if err != nil {
@@ -78,9 +116,19 @@ func main() {
 
 	router.Add("GET", "/upload/lastentry/{userID}/{deviceID}",
 		http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			res.WriteHeader(http.StatusOK)
-			//userID := req.URL.Query().Get(":userID")
+			userID := req.URL.Query().Get(":userID")
 			//deviceID := req.URL.Query().Get(":deviceID")
+			token := req.Header.Get("x-tidepool-session-token")
+			td := shorelineClient.CheckToken(token)
+
+			if td == nil || !(td.IsServer || td.UserID == userID || userCanViewData(td.UserID, userID)) {
+				res.WriteHeader(403)
+				return
+			}
+
+			res.WriteHeader(http.StatusOK)
+			res.Write([]byte("Hi there"))
+
 		}))
 
 	done := make(chan bool)
