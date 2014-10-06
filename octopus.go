@@ -65,6 +65,10 @@ func main() {
 		WithConfig(&config.ShorelineConfig.ShorelineClientConfig).
 		Build()
 
+	if err := shorelineClient.Start(); err != nil {
+		log.Fatal(err)
+	}
+
 	seagullClient := clients.NewSeagullClientBuilder().
 		WithHostGetter(config.SeagullConfig.ToHostGetter(hakkenClient)).
 		WithHttpClient(httpClient).

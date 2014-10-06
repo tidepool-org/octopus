@@ -1,7 +1,6 @@
 package clients
 
 import (
-	//	"./../models"
 	"errors"
 )
 
@@ -24,6 +23,6 @@ func (d MockStoreClient) Ping() error {
 	return nil
 }
 
-func (d MockStoreClient) GetTimeLastEntry(groupId, deviceId string) string {
-	return "always the same"
+func (d MockStoreClient) GetTimeLastEntry(groupId, deviceId string) []byte {
+	return []byte("always the same")
 }

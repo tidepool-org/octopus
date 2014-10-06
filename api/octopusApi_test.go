@@ -57,7 +57,7 @@ var (
 	storeFail        = clients.NewMockStoreClient("salty", false, true)
 	rtr              = mux.NewRouter()
 	octopus          = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, store)
-	octopuFail       = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
+	octopusFail      = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
 )
 
 func TestGetStatus_StatusOk(t *testing.T) {

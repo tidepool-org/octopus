@@ -2,7 +2,6 @@ package api
 
 import (
 	"./../clients"
-	//"fmt"
 	"github.com/gorilla/mux"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
@@ -21,9 +20,6 @@ type SeagullInterface interface {
 
 type GatekeeperInterface interface {
 	UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error)
-}
-
-type MongoInterface interface {
 }
 
 type (
@@ -92,6 +88,7 @@ func (a *Api) GetLastEntry(res http.ResponseWriter, req *http.Request, vars map[
 	deviceId := vars["deviceID"]
 
 	token := req.Header.Get("x-tidepool-session-token")
+
 	td := a.ShorelineClient.CheckToken(token)
 
 	if td == nil || !(td.IsServer || td.UserID == userID || a.userCanViewData(td.UserID, userID)) {
@@ -110,7 +107,7 @@ func (a *Api) GetLastEntry(res http.ResponseWriter, req *http.Request, vars map[
 	timeLastEntry := a.Store.GetTimeLastEntry(groupId, deviceId)
 
 	res.WriteHeader(http.StatusOK)
-	res.Write([]byte(timeLastEntry))
+	res.Write(timeLastEntry)
 }
 
 func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
