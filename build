@@ -4,7 +4,7 @@ export GOPATH=`pwd`
 
 come_deps.sh
 
-PROJECT=gofish
+PROJECT=octopus
 
 OUTDIR=dist
 rm -rf ${OUTDIR}

@@ -7,6 +7,6 @@
     "certFile": "config/cert.pem"
   },
   "mongo": {
-    "connectionString": "mongodb://localhost/user"
+    "connectionString": "mongodb://localhost/stream"
   }
 }
