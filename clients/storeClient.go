@@ -3,5 +3,6 @@ package clients
 type StoreClient interface {
 	Close()
 	Ping() error
-	GetTimeLastEntry(groupId, deviceId string) []byte
+	GetTimeLastEntryUser(groupId string) []byte
+	GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte
 }

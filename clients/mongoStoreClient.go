@@ -47,7 +47,22 @@ func (d MongoStoreClient) Ping() error {
 	return nil
 }
 
-func (d MongoStoreClient) GetTimeLastEntry(groupId, deviceId string) []byte {
+func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
+	mongoSession := d.session.Copy()
+	var result map[string]interface{}
+	c := mongoSession.DB("").C("deviceData")
+	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
+		bson.M{"_groupId": groupId, "_active": true}}}
+	// Get the entry with the latest time by reverse sorting and taking the first value
+	c.Find(groupIdQuery).Sort("-time").One(&result)
+	bytes, err := json.Marshal(result["time"])
+	if err != nil {
+		log.Print("Failed to marshall event", result, err)
+	}
+	return bytes
+}
+
+func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte {
 	mongoSession := d.session.Copy()
 	var result map[string]interface{}
 	c := mongoSession.DB("").C("deviceData")
