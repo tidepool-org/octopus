@@ -16,6 +16,7 @@ const (
 	FAKE_TOKEN    = "yolo"
 	FAKE_GROUP_ID = "abcdefg"
 	FAKE_VALUE    = "gfedcba"
+	FAKE_USER_ID  = "oldgreg"
 )
 
 type TestConfig struct {
@@ -27,11 +28,12 @@ type TestConfig struct {
 
 type MockShorelineClient struct {
 	validToken bool
+	token      shoreline.TokenData
 }
 
 func (slc MockShorelineClient) CheckToken(token string) *shoreline.TokenData {
 	if slc.validToken {
-		return &shoreline.TokenData{FAKE_TOKEN, true}
+		return &slc.token
 	} else {
 		return nil
 	}
@@ -54,69 +56,55 @@ func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (map[string]
 }
 
 var (
-	config                TestConfig
-	shorelineClient       = MockShorelineClient{true}
-	shorelineClientNoAuth = MockShorelineClient{false}
-	seagullClient         = MockSeagullClient{}
-	gatekeeperClient      = MockGateKeeperClient{}
-	store                 = clients.NewMockStoreClient("salty", false, false)
-	storeFail             = clients.NewMockStoreClient("salty", false, true)
-	rtr                   = mux.NewRouter()
-	octopus               = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, store)
-	octopusNoAuth         = InitApi(config.Api, shorelineClientNoAuth, seagullClient, gatekeeperClient, store)
-	octopusFail           = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
+	config           TestConfig
+	vars             = httpVars{"userId": FAKE_USER_ID}
+	tokenIsServer    = shoreline.TokenData{FAKE_TOKEN, true}
+	tokenIsNotServer = shoreline.TokenData{FAKE_TOKEN, false}
+	shorelineClient  = MockShorelineClient{true, tokenIsServer}
+	slcNilToken      = MockShorelineClient{false, tokenIsServer}
+	seagullClient    = MockSeagullClient{}
+	gatekeeperClient = MockGateKeeperClient{}
+	store            = clients.NewMockStoreClient("salty", false, false)
+	storeFail        = clients.NewMockStoreClient("salty", false, true)
+	rtr              = mux.NewRouter()
+	octopus          = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, store)
+	octopusNilToken  = InitApi(config.Api, slcNilToken, seagullClient, gatekeeperClient, store)
+	octopusFail      = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
 )
 
+func genReqRes() (request *http.Request, response *httptest.ResponseRecorder) {
+	request, _ = http.NewRequest("GET", "/", nil)
+	response = httptest.NewRecorder()
+	return
+}
+
 func TestGetStatus_StatusOk(t *testing.T) {
-
-	// The request isn't actually used
-	request, _ := http.NewRequest("GET", "/", nil)
-	response := httptest.NewRecorder()
-
-	octopus.GetStatus(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("Resp given [%s] expected [%s] ", response.Code, http.StatusOK)
+	req, res := genReqRes()
+	octopus.GetStatus(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusOK)
 	}
 }
 
 func TestGetStatus_StatusInternalServerError(t *testing.T) {
-
-	// The request isn't actually used
-	request, _ := http.NewRequest("GET", "/", nil)
-	response := httptest.NewRecorder()
-
-	octopusFail.GetStatus(response, request)
-
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("Resp given [%s] expected [%s] ", response.Code, http.StatusInternalServerError)
+	req, res := genReqRes()
+	octopusFail.GetStatus(res, req)
+	if res.Code != http.StatusInternalServerError {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusInternalServerError)
 	}
 }
 
 func TestTimeLastEntryUser_Success(t *testing.T) {
-
-	// The request isn't actually used
-	request, _ := http.NewRequest("GET", "/", nil)
-	response := httptest.NewRecorder()
-
-	vars := make(httpVars)
-	vars["userID"] = "old greg"
-
-	octopus.TimeLastEntryUser(response, request, vars)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("Resp given [%s] expected [%s] ", response.Code, http.StatusOK)
+	req, res := genReqRes()
+	octopus.TimeLastEntryUser(res, req, vars)
+	if res.Code != http.StatusOK {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusOK)
 	}
 }
 
-func TestTimeLastEntryUser_StatusForbidden(t *testing.T) {
-	// The request isn't actually used
-	req, _ := http.NewRequest("GET", "/", nil)
-	res := httptest.NewRecorder()
-	vars := make(httpVars)
-	vars["userID"] = "oldgreg"
-
-	octopusNoAuth.TimeLastEntryUser(res, req, vars)
+func TestTimeLastEntryUser_NilToken_StatusForbidden(t *testing.T) {
+	req, res := genReqRes()
+	octopusNilToken.TimeLastEntryUser(res, req, vars)
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
 	}
