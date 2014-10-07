@@ -3,20 +3,19 @@ package api
 import (
 	"./../clients"
 	"github.com/gorilla/mux"
-	//"github.com/tidepool-org/go-common"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"github.com/tidepool-org/go-common/clients/shoreline"
-	//"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 const (
-	THE_SECRET   = "shhh! don't tell"
-	MAKE_IT_FAIL = true
+	FAKE_TOKEN    = "yolo"
+	FAKE_GROUP_ID = "abcdefg"
+	FAKE_VALUE    = "gfedcba"
 )
 
 type TestConfig struct {
@@ -26,20 +25,26 @@ type TestConfig struct {
 	Api     Config              `json:"octopus"`
 }
 
-type MockShorelineClient struct{}
+type MockShorelineClient struct {
+	validToken bool
+}
 
 func (slc MockShorelineClient) CheckToken(token string) *shoreline.TokenData {
-	return &shoreline.TokenData{"yolo", true}
+	if slc.validToken {
+		return &shoreline.TokenData{FAKE_TOKEN, true}
+	} else {
+		return nil
+	}
 }
 
 func (slc MockShorelineClient) TokenProvide() string {
-	return "yolo"
+	return FAKE_TOKEN
 }
 
 type MockSeagullClient struct{}
 
 func (sgc MockSeagullClient) GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair {
-	return &commonClients.PrivatePair{"yolo", "yolo"}
+	return &commonClients.PrivatePair{FAKE_GROUP_ID, FAKE_VALUE}
 }
 
 type MockGateKeeperClient struct{}
@@ -49,15 +54,17 @@ func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (map[string]
 }
 
 var (
-	config           TestConfig
-	shorelineClient  = MockShorelineClient{}
-	seagullClient    = MockSeagullClient{}
-	gatekeeperClient = MockGateKeeperClient{}
-	store            = clients.NewMockStoreClient("salty", false, false)
-	storeFail        = clients.NewMockStoreClient("salty", false, true)
-	rtr              = mux.NewRouter()
-	octopus          = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, store)
-	octopusFail      = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
+	config                TestConfig
+	shorelineClient       = MockShorelineClient{true}
+	shorelineClientNoAuth = MockShorelineClient{false}
+	seagullClient         = MockSeagullClient{}
+	gatekeeperClient      = MockGateKeeperClient{}
+	store                 = clients.NewMockStoreClient("salty", false, false)
+	storeFail             = clients.NewMockStoreClient("salty", false, true)
+	rtr                   = mux.NewRouter()
+	octopus               = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, store)
+	octopusNoAuth         = InitApi(config.Api, shorelineClientNoAuth, seagullClient, gatekeeperClient, store)
+	octopusFail           = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
 )
 
 func TestGetStatus_StatusOk(t *testing.T) {
@@ -86,19 +93,31 @@ func TestGetStatus_StatusInternalServerError(t *testing.T) {
 	}
 }
 
-func TestGetLastEntry_Success(t *testing.T) {
+func TestTimeLastEntryUser_Success(t *testing.T) {
 
 	// The request isn't actually used
 	request, _ := http.NewRequest("GET", "/", nil)
 	response := httptest.NewRecorder()
 
-	vars := make(map[string]string)
+	vars := make(httpVars)
 	vars["userID"] = "old greg"
-	vars["deviceID"] = "johndeer"
 
-	octopus.GetLastEntry(response, request, vars)
+	octopus.TimeLastEntryUser(response, request, vars)
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("Resp given [%s] expected [%s] ", response.Code, http.StatusOK)
+	}
+}
+
+func TestTimeLastEntryUser_StatusForbidden(t *testing.T) {
+	// The request isn't actually used
+	req, _ := http.NewRequest("GET", "/", nil)
+	res := httptest.NewRecorder()
+	vars := make(httpVars)
+	vars["userID"] = "oldgreg"
+
+	octopusNoAuth.TimeLastEntryUser(res, req, vars)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
 	}
 }

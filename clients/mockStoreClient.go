@@ -23,6 +23,10 @@ func (d MockStoreClient) Ping() error {
 	return nil
 }
 
-func (d MockStoreClient) GetTimeLastEntry(groupId, deviceId string) []byte {
-	return []byte("always the same")
+func (d MockStoreClient) GetTimeLastEntryUser(deviceId string) []byte {
+	return []byte("GetTimeLastEntryUser")
+}
+
+func (d MockStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte {
+	return []byte("GetTimeLastEntryUserDevice")
 }
