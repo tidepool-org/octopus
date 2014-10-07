@@ -5,15 +5,12 @@ import (
 	sc "./clients"
 	"crypto/tls"
 	"github.com/gorilla/mux"
-	//"fmt"
-	//"github.com/gorilla/pat"
 	"github.com/tidepool-org/go-common"
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
 	"github.com/tidepool-org/go-common/clients/hakken"
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"github.com/tidepool-org/go-common/clients/shoreline"
-	//"labix.org/v2/mgo/bson"
 	"log"
 	"net/http"
 	"os"
@@ -106,7 +103,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//hakkenClient.Publish(&config.Service)
+	hakkenClient.Publish(&config.Service)
 
 	signals := make(chan os.Signal, 40)
 	signal.Notify(signals)

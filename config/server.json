@@ -1,8 +1,8 @@
 {
   "service": {
-    "service": "last-update-local",
+    "service": "query-local",
     "protocol": "http",
-    "host": "localhost:9988",
+    "host": "localhost:9130",
     "keyFile": "config/key.pem",
     "certFile": "config/cert.pem"
   },
