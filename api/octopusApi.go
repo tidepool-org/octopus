@@ -3,6 +3,7 @@ package api
 import (
 	"./../clients"
 	"errors"
+	"fmt"
 	"github.com/gorilla/mux"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
@@ -93,7 +94,11 @@ func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request,
 
 	td := a.ShorelineClient.CheckToken(token)
 
-	if td == nil || !(td.IsServer || td.UserID == userID || a.userCanViewData(td.UserID, userID)) {
+	if td != nil {
+		fmt.Println("td.UserID", td.UserID, "userID", userID)
+	}
+
+	if td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
 		res.WriteHeader(http.StatusForbidden)
 		return "fail", errors.New("Forbidden")
 	}

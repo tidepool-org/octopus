@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	FAKE_TOKEN    = "yolo"
-	FAKE_GROUP_ID = "abcdefg"
-	FAKE_VALUE    = "gfedcba"
-	FAKE_USER_ID  = "oldgreg"
+	FAKE_TOKEN             = "yolo"
+	FAKE_GROUP_ID          = "abcdefg"
+	FAKE_VALUE             = "gfedcba"
+	FAKE_USER_ID           = "oldgreg"
+	FAKE_USER_ID_DIFFERENT = "different"
 )
 
 type TestConfig struct {
@@ -56,20 +57,23 @@ func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (map[string]
 }
 
 var (
-	config           TestConfig
-	vars             = httpVars{"userId": FAKE_USER_ID}
-	tokenIsServer    = shoreline.TokenData{FAKE_TOKEN, true}
-	tokenIsNotServer = shoreline.TokenData{FAKE_TOKEN, false}
-	shorelineClient  = MockShorelineClient{true, tokenIsServer}
-	slcNilToken      = MockShorelineClient{false, tokenIsServer}
-	seagullClient    = MockSeagullClient{}
-	gatekeeperClient = MockGateKeeperClient{}
-	store            = clients.NewMockStoreClient("salty", false, false)
-	storeFail        = clients.NewMockStoreClient("salty", false, true)
-	rtr              = mux.NewRouter()
-	octopus          = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, store)
-	octopusNilToken  = InitApi(config.Api, slcNilToken, seagullClient, gatekeeperClient, store)
-	octopusFail      = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
+	config                TestConfig
+	vars                  = httpVars{"userID": FAKE_USER_ID}
+	varsDifferent         = httpVars{"userID": FAKE_USER_ID_DIFFERENT}
+	tokenIsServer         = shoreline.TokenData{FAKE_USER_ID, true}
+	tokenIsNotServer      = shoreline.TokenData{FAKE_USER_ID, false}
+	shorelineClient       = MockShorelineClient{true, tokenIsServer}
+	slcNilToken           = MockShorelineClient{false, tokenIsServer}
+	slcTokenNotServer     = MockShorelineClient{true, tokenIsNotServer}
+	seagullClient         = MockSeagullClient{}
+	gatekeeperClient      = MockGateKeeperClient{}
+	store                 = clients.NewMockStoreClient("salty", false, false)
+	storeFail             = clients.NewMockStoreClient("salty", false, true)
+	rtr                   = mux.NewRouter()
+	octopus               = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, store)
+	octopusNilToken       = InitApi(config.Api, slcNilToken, seagullClient, gatekeeperClient, store)
+	octopusFail           = InitApi(config.Api, shorelineClient, seagullClient, gatekeeperClient, storeFail)
+	octopusTokenNotServer = InitApi(config.Api, slcTokenNotServer, seagullClient, gatekeeperClient, store)
 )
 
 func genReqRes() (request *http.Request, response *httptest.ResponseRecorder) {
@@ -105,6 +109,32 @@ func TestTimeLastEntryUser_Success(t *testing.T) {
 func TestTimeLastEntryUser_NilToken_StatusForbidden(t *testing.T) {
 	req, res := genReqRes()
 	octopusNilToken.TimeLastEntryUser(res, req, vars)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
+	}
+}
+
+func TestTimeLastEntryUser_NotAuthorized_StatusForbidden(t *testing.T) {
+	req, res := genReqRes()
+	octopusTokenNotServer.TimeLastEntryUser(res, req, varsDifferent)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
+	}
+}
+
+/* User and device tests */
+
+func TestTimeLastEntryUserAndDevice_Success(t *testing.T) {
+	req, res := genReqRes()
+	octopus.TimeLastEntryUserAndDevice(res, req, vars)
+	if res.Code != http.StatusOK {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusOK)
+	}
+}
+
+func TestTimeLastEntryUserAndDevice_NilToken_StatusForbidden(t *testing.T) {
+	req, res := genReqRes()
+	octopusNilToken.TimeLastEntryUserAndDevice(res, req, vars)
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
 	}
