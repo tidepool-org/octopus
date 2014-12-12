@@ -7,15 +7,33 @@ It was initially created by [anderspitman](https://github.com/anderspitman) upon
 
 The purpose of this API is to provide the framework for queries against the Tidepool platform.
 
-The first version of this API will be largely a fa&cedille;ade, designed to mimic the eventual API but with a tightly constrained set of functionality.
+The first version of this API will be largely faked, designed to mimic the eventual API but with a tightly constrained set of functionality.
 
-Here is what we expect to do for the first version:
+The version that was originally created was specified to do a simple query against the data stream to return the date and time of the last known data item for a given device. The next version will also include a constrained version of a general-purpose query API.
+
+Here is what we expect to implement for the next version:
+
+## Status
+
+    GET /status
+
+Returns 200 and OK if the status is good, 500 if the data store is unreachable.
+
+## Last Entry for a user
+
+    GET /upload/lastentry/{userid}
+
+Returns 200 and an ISO8601 timestamp of the last data record for a given userid.
+
+## Last Entry for a user's device
+
+    GET /upload/lastentry/{userid}/{deviceid}
+
+Returns 200 and an ISO8601 timestamp of the last data record for a given userid / deviceid combination.
 
 ## Query submission
 
-To submit a query, POST to:
-
-/query
+    POST /query
 
 where the body of the post is the query text. You must use a standard Tidepool authentication token in the headers.
 
