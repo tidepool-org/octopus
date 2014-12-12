@@ -11,31 +11,33 @@ The first version of this API will be largely faked, designed to mimic the event
 
 The version that was originally created was specified to do a simple query against the data stream to return the date and time of the last known data item for a given device. The next version will also include a constrained version of a general-purpose query API.
 
+Authenticated calls must use a standard Tidepool authentication token in the headers. See the login function within [platform-client](https://github.com/tidepool-org/platform-client/blob/master/index.js) for details on how to log in and get one.
+
 Here is what we expect to implement for the next version:
 
 ## Status
 
     GET /status
 
-Returns 200 and OK if the status is good, 500 if the data store is unreachable.
+Does not require authentication. Returns 200 and OK if the status is good, 500 if the data store is unreachable.
 
 ## Last Entry for a user
 
     GET /upload/lastentry/{userid}
 
-Returns 200 and an ISO8601 timestamp of the last data record for a given userid.
+Requires authentication. Returns 200 and an ISO8601 timestamp of the last data record for a given userid.
 
 ## Last Entry for a user's device
 
     GET /upload/lastentry/{userid}/{deviceid}
 
-Returns 200 and an ISO8601 timestamp of the last data record for a given userid / deviceid combination.
+Requires authentication. Returns 200 and an ISO8601 timestamp of the last data record for a given userid / deviceid combination.
 
 ## Query submission
 
     POST /query
 
-where the body of the post is the query text. You must use a standard Tidepool authentication token in the headers.
+Requires authentication. The body of the post is the query text.
 
 The result will be 200 response with the MIME type of application/json, containing a JSON object with the results. If the query generates an empty set, the result will be 200 with an empty array. If the query fails to parse, the result will be 400.
 
