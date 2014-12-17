@@ -2,10 +2,11 @@ package clients
 
 import (
 	"encoding/json"
+	"log"
+
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"log"
 )
 
 const (
