@@ -1,6 +1,8 @@
 octopus
 =======
 
+[![Build Status](https://travis-ci.org/tidepool-org/octopus.png)](https://travis-ci.org/tidepool-org/octopus)
+
 This is a data query API for Tidepool.
 
 It was initially created by [anderspitman](https://github.com/anderspitman) upon request by Tidepool.
