@@ -1,30 +1,17 @@
 package api
 
 import (
-	"./../clients"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
-	"log"
-	"net/http"
+
+	"./../clients"
 )
-
-type ShorelineInterface interface {
-	CheckToken(token string) *shoreline.TokenData
-	TokenProvide() string
-}
-
-type SeagullInterface interface {
-	GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair
-}
-
-type GatekeeperInterface interface {
-	UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error)
-}
-
-type httpVars map[string]string
 
 type (
 	Api struct {
@@ -40,6 +27,22 @@ type (
 		Salt         string `json:"salt"`      //used for pw
 		Secret       string `json:"apiSecret"` //used for token
 	}
+
+	GatekeeperInterface interface {
+		UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error)
+	}
+
+	SeagullInterface interface {
+		GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair
+	}
+
+	ShorelineInterface interface {
+		CheckToken(token string) *shoreline.TokenData
+		TokenProvide() string
+	}
+
+	httpVars map[string]string
+
 	varsHandler func(http.ResponseWriter, *http.Request, httpVars)
 )
 
