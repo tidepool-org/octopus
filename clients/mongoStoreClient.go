@@ -10,14 +10,12 @@ import (
 )
 
 const (
-	USERS_COLLECTION  = "users"
-	TOKENS_COLLECTION = "tokens"
+	DEVICE_DATA_COLLECTION = "deviceData"
 )
 
 type MongoStoreClient struct {
-	session *mgo.Session
-	usersC  *mgo.Collection
-	tokensC *mgo.Collection
+	session     *mgo.Session
+	deviceDataC *mgo.Collection
 }
 
 func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
@@ -28,9 +26,8 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 	}
 
 	return &MongoStoreClient{
-		session: mongoSession,
-		usersC:  mongoSession.DB("").C(USERS_COLLECTION),
-		tokensC: mongoSession.DB("").C(TOKENS_COLLECTION),
+		session:     mongoSession,
+		deviceDataC: mongoSession.DB("").C(DEVICE_DATA_COLLECTION),
 	}
 }
 
@@ -51,7 +48,7 @@ func (d MongoStoreClient) Ping() error {
 func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
 	mongoSession := d.session.Copy()
 	var result map[string]interface{}
-	c := mongoSession.DB("").C("deviceData")
+	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
 	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
 		bson.M{"_groupId": groupId, "_active": true}}}
 	// Get the entry with the latest time by reverse sorting and taking the first value
@@ -66,7 +63,7 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
 func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte {
 	mongoSession := d.session.Copy()
 	var result map[string]interface{}
-	c := mongoSession.DB("").C("deviceData")
+	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
 	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
 		bson.M{"_groupId": groupId, "_active": true}}}
 	deviceIdQuery := bson.M{"deviceId": deviceId}
