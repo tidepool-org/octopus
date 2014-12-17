@@ -95,9 +95,7 @@ func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request,
 	userID := vars["userID"]
 	token := req.Header.Get("x-tidepool-session-token")
 
-	td := a.ShorelineClient.CheckToken(token)
-
-	if td != nil {
+	if td := a.ShorelineClient.CheckToken(token); td != nil {
 		fmt.Println("td.UserID", td.UserID, "userID", userID)
 	}
 
@@ -106,19 +104,16 @@ func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request,
 		return "fail", errors.New("Forbidden")
 	}
 
-	pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide())
-	if pair == nil {
+	if pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		return "fail", errors.New("Internal server error")
 	}
 
-	groupId := pair.ID
-	return groupId, nil
+	return pair.ID, nil
 }
 
 func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars httpVars) {
-	groupId, err := a.authorizeAndGetGroupId(res, req, vars)
-	if err != nil {
+	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
 	}
 	timeLastEntry := a.Store.GetTimeLastEntryUser(groupId)
@@ -127,12 +122,11 @@ func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars
 }
 
 func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Request, vars httpVars) {
-	deviceId := vars["deviceID"]
-
-	groupId, err := a.authorizeAndGetGroupId(res, req, vars)
-	if err != nil {
+	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
 	}
+
+	deviceId := vars["deviceID"]
 
 	timeLastEntry := a.Store.GetTimeLastEntryUserAndDevice(groupId, deviceId)
 
