@@ -1,0 +1,9 @@
+bin
+src
+pkg
+dist
+.idea
+*.iml
+octopus
+
+*.sublime-*

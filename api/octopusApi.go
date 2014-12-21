@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -93,13 +92,8 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 
 func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request, vars httpVars) (string, error) {
 	userID := vars["userID"]
-	token := req.Header.Get("x-tidepool-session-token")
 
-	if td := a.ShorelineClient.CheckToken(token); td != nil {
-		fmt.Println("td.UserID", td.UserID, "userID", userID)
-	}
-
-	if td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
+	if td := a.ShorelineClient.CheckToken(req.Header.Get("x-tidepool-session-token")); td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
 		res.WriteHeader(http.StatusForbidden)
 		return "fail", errors.New("Forbidden")
 	}
@@ -107,33 +101,35 @@ func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request,
 	if pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		return "fail", errors.New("Internal server error")
+	} else {
+		return pair.ID, nil
 	}
-
-	return pair.ID, nil
 }
 
 // http.StatusOK,  time of last entry
 func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars httpVars) {
 	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
+	} else {
+		timeLastEntry := a.Store.GetTimeLastEntryUser(groupId)
+		res.WriteHeader(http.StatusOK)
+		res.Write(timeLastEntry)
 	}
-	timeLastEntry := a.Store.GetTimeLastEntryUser(groupId)
-	res.WriteHeader(http.StatusOK)
-	res.Write(timeLastEntry)
 }
 
 // http.StatusOK, time of last entry and device
 func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Request, vars httpVars) {
 	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
+	} else {
+
+		deviceId := vars["deviceID"]
+
+		timeLastEntry := a.Store.GetTimeLastEntryUserAndDevice(groupId, deviceId)
+
+		res.WriteHeader(http.StatusOK)
+		res.Write(timeLastEntry)
 	}
-
-	deviceId := vars["deviceID"]
-
-	timeLastEntry := a.Store.GetTimeLastEntryUserAndDevice(groupId, deviceId)
-
-	res.WriteHeader(http.StatusOK)
-	res.Write(timeLastEntry)
 }
 
 func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
