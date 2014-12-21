@@ -112,6 +112,7 @@ func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request,
 	return pair.ID, nil
 }
 
+// http.StatusOK,  time of last entry
 func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars httpVars) {
 	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
@@ -121,6 +122,7 @@ func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars
 	res.Write(timeLastEntry)
 }
 
+// http.StatusOK, time of last entry and device
 func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Request, vars httpVars) {
 	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
