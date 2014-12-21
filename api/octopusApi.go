@@ -1,30 +1,16 @@
 package api
 
 import (
-	"./../clients"
 	"errors"
-	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
-	"log"
-	"net/http"
+
+	"./../clients"
 )
-
-type ShorelineInterface interface {
-	CheckToken(token string) *shoreline.TokenData
-	TokenProvide() string
-}
-
-type SeagullInterface interface {
-	GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair
-}
-
-type GatekeeperInterface interface {
-	UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error)
-}
-
-type httpVars map[string]string
 
 type (
 	Api struct {
@@ -40,6 +26,22 @@ type (
 		Salt         string `json:"salt"`      //used for pw
 		Secret       string `json:"apiSecret"` //used for token
 	}
+
+	GatekeeperInterface interface {
+		UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error)
+	}
+
+	SeagullInterface interface {
+		GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair
+	}
+
+	ShorelineInterface interface {
+		CheckToken(token string) *shoreline.TokenData
+		TokenProvide() string
+	}
+
+	httpVars map[string]string
+
 	varsHandler func(http.ResponseWriter, *http.Request, httpVars)
 )
 
@@ -90,51 +92,44 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 
 func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request, vars httpVars) (string, error) {
 	userID := vars["userID"]
-	token := req.Header.Get("x-tidepool-session-token")
 
-	td := a.ShorelineClient.CheckToken(token)
-
-	if td != nil {
-		fmt.Println("td.UserID", td.UserID, "userID", userID)
-	}
-
-	if td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
+	if td := a.ShorelineClient.CheckToken(req.Header.Get("x-tidepool-session-token")); td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
 		res.WriteHeader(http.StatusForbidden)
 		return "fail", errors.New("Forbidden")
 	}
 
-	pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide())
-	if pair == nil {
+	if pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		return "fail", errors.New("Internal server error")
+	} else {
+		return pair.ID, nil
 	}
-
-	groupId := pair.ID
-	return groupId, nil
 }
 
+// http.StatusOK,  time of last entry
 func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars httpVars) {
-	groupId, err := a.authorizeAndGetGroupId(res, req, vars)
-	if err != nil {
+	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
+	} else {
+		timeLastEntry := a.Store.GetTimeLastEntryUser(groupId)
+		res.WriteHeader(http.StatusOK)
+		res.Write(timeLastEntry)
 	}
-	timeLastEntry := a.Store.GetTimeLastEntryUser(groupId)
-	res.WriteHeader(http.StatusOK)
-	res.Write(timeLastEntry)
 }
 
+// http.StatusOK, time of last entry and device
 func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Request, vars httpVars) {
-	deviceId := vars["deviceID"]
-
-	groupId, err := a.authorizeAndGetGroupId(res, req, vars)
-	if err != nil {
+	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
 		return
+	} else {
+
+		deviceId := vars["deviceID"]
+
+		timeLastEntry := a.Store.GetTimeLastEntryUserAndDevice(groupId, deviceId)
+
+		res.WriteHeader(http.StatusOK)
+		res.Write(timeLastEntry)
 	}
-
-	timeLastEntry := a.Store.GetTimeLastEntryUserAndDevice(groupId, deviceId)
-
-	res.WriteHeader(http.StatusOK)
-	res.Write(timeLastEntry)
 }
 
 func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
