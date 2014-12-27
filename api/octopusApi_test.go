@@ -139,3 +139,11 @@ func TestTimeLastEntryUserAndDevice_NilToken_StatusForbidden(t *testing.T) {
 		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
 	}
 }
+
+func TestQuery_Status(t *testing.T) {
+	req, res := genReqRes()
+	octopus.Query(res, req)
+	if res.Code != http.StatusNotImplemented {
+		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusNotImplemented)
+	}
+}

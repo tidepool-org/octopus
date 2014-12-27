@@ -12,6 +12,11 @@ import (
 	"./../clients"
 )
 
+const (
+	SESSION_TOKEN    = "x-tidepool-session-token"
+	QUERY_NOT_PARSED = ""
+)
+
 type (
 	Api struct {
 		Store            clients.StoreClient
@@ -22,9 +27,6 @@ type (
 	}
 	Config struct {
 		ServerSecret string `json:"serverSecret"` //used for services
-		LongTermKey  string `json:"longTermKey"`
-		Salt         string `json:"salt"`      //used for pw
-		Secret       string `json:"apiSecret"` //used for token
 	}
 
 	GatekeeperInterface interface {
@@ -77,6 +79,7 @@ func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 	rtr.HandleFunc("/status", a.GetStatus).Methods("GET")
 	rtr.Handle("/upload/lastentry/{userID}", varsHandler(a.TimeLastEntryUser)).Methods("GET")
 	rtr.Handle("/upload/lastentry/{userID}/{deviceID}", varsHandler(a.TimeLastEntryUserAndDevice)).Methods("GET")
+	rtr.HandleFunc("/query", a.Query).Methods("POST")
 }
 
 func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
@@ -93,7 +96,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request, vars httpVars) (string, error) {
 	userID := vars["userID"]
 
-	if td := a.ShorelineClient.CheckToken(req.Header.Get("x-tidepool-session-token")); td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
+	if td := a.ShorelineClient.CheckToken(req.Header.Get(SESSION_TOKEN)); td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
 		res.WriteHeader(http.StatusForbidden)
 		return "fail", errors.New("Forbidden")
 	}
@@ -130,6 +133,14 @@ func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Requ
 		res.WriteHeader(http.StatusOK)
 		res.Write(timeLastEntry)
 	}
+}
+
+// http.StatusOK
+// http.StatusNotAcceptable
+func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
+
+	res.WriteHeader(http.StatusNotImplemented)
+	return
 }
 
 func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
