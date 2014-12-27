@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	SESSION_TOKEN    = "x-tidepool-session-token"
-	QUERY_NOT_PARSED = ""
+	SESSION_TOKEN = "x-tidepool-session-token"
 )
 
 type (
@@ -62,6 +61,22 @@ func (a *Api) userCanViewData(userID, groupID string) bool {
 	return !(perms["root"] == nil && perms["view"] == nil)
 }
 
+func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request, vars httpVars) (string, error) {
+	userID := vars["userID"]
+
+	if td := a.ShorelineClient.CheckToken(req.Header.Get(SESSION_TOKEN)); td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
+		res.WriteHeader(http.StatusForbidden)
+		return "fail", errors.New("Forbidden")
+	}
+
+	if pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		return "fail", errors.New("Internal server error")
+	} else {
+		return pair.ID, nil
+	}
+}
+
 func InitApi(cfg Config, slc ShorelineInterface,
 	sgc SeagullInterface, gkc GatekeeperInterface,
 	store clients.StoreClient) *Api {
@@ -93,22 +108,6 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte("OK"))
 }
 
-func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request, vars httpVars) (string, error) {
-	userID := vars["userID"]
-
-	if td := a.ShorelineClient.CheckToken(req.Header.Get(SESSION_TOKEN)); td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
-		res.WriteHeader(http.StatusForbidden)
-		return "fail", errors.New("Forbidden")
-	}
-
-	if pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
-		res.WriteHeader(http.StatusInternalServerError)
-		return "fail", errors.New("Internal server error")
-	} else {
-		return pair.ID, nil
-	}
-}
-
 // http.StatusOK,  time of last entry
 func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars httpVars) {
 	if groupId, err := a.authorizeAndGetGroupId(res, req, vars); err != nil {
@@ -133,14 +132,6 @@ func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Requ
 		res.WriteHeader(http.StatusOK)
 		res.Write(timeLastEntry)
 	}
-}
-
-// http.StatusOK
-// http.StatusNotAcceptable
-func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
-
-	res.WriteHeader(http.StatusNotImplemented)
-	return
 }
 
 func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
