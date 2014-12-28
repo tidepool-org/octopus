@@ -80,19 +80,45 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	return bytes
 }
 
-func (d MongoStoreClient) constructQuery(details model.QueryData) (query bson.M) {
-	return query
+func constructQuery(details model.QueryData) (query bson.M, typesIn bson.M) {
+	//METAQUERY WHERE userid IS "12d7bc90fa"
+	//QUERY TYPE IN cbg, smbg, bolus, wizard WHERE time > starttime AND time < endtime SORT BY time AS Timestamp REVERSED
+
+	for k, v := range details.Where {
+		log.Printf("key [%s]  value [%s]", k, v)
+		query["$or"] = []bson.M{bson.M{"groupId": v}, bson.M{"_groupId": v, "_active": true}}
+	}
+
+	log.Printf("where clause will be [%v]", query)
+
+	for i := range details.Types {
+		typesIn[details.Types[i]] = 1
+	}
+
+	log.Printf("will include feilds [%v]", typesIn)
+
+	return query, typesIn
 }
 
 func (d MongoStoreClient) ExecuteQuery(details model.QueryData) []byte {
 	mongoSession := d.session.Copy()
 	var result map[string]interface{}
+	var sortField = ""
 	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
 
-	query := bson.M{}
-	// Get the entry with the latest time by reverse sorting and taking the first value
-	c.Find(query).Sort("-time").One(&result)
-	bytes, err := json.Marshal(result["time"])
+	query, inTypes := constructQuery(details)
+
+	for k := range details.Sort {
+		sortField = k
+		if details.Reverse {
+			sortField = "-" + sortField
+		}
+	}
+
+	log.Printf("sort by [%s]", sortField)
+
+	c.Find([]bson.M{query, inTypes}).Sort(sortField).One(&result)
+	bytes, err := json.Marshal(result)
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
 	}
