@@ -14,3 +14,5 @@ install:
 script:
  - source ./build
  - cd api && go test -v
+ - cd ../model && go test -v
+ - cd ../clients && go test -v
