@@ -12,6 +12,15 @@ import (
 	"../model"
 )
 
+var (
+	qd = &model.QueryData{
+		Where:   map[string]string{"userid": "1234"},
+		Types:   []string{"cbg", "smbg"},
+		Sort:    map[string]string{"time": "myTime"},
+		Reverse: false,
+	}
+)
+
 func TestMongoStore(t *testing.T) {
 
 	type Config struct {
@@ -47,13 +56,6 @@ func TestMongoStore(t *testing.T) {
 }
 
 func TestQueryConstruction(t *testing.T) {
-
-	qd := &model.QueryData{
-		Where:   map[string]string{"userid": "1234"},
-		Types:   []string{"cbg", "smbg"},
-		Sort:    map[string]string{"time": "myTime"},
-		Reverse: false,
-	}
 
 	q, in := constructQuery(qd)
 
