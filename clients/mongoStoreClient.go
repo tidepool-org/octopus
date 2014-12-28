@@ -80,27 +80,25 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	return bytes
 }
 
-func constructQuery(details model.QueryData) (query bson.M, typesIn bson.M) {
+func constructQuery(details *model.QueryData) (query bson.M, typesIn bson.M) {
 	//METAQUERY WHERE userid IS "12d7bc90fa"
 	//QUERY TYPE IN cbg, smbg, bolus, wizard WHERE time > starttime AND time < endtime SORT BY time AS Timestamp REVERSED
 
-	for k, v := range details.Where {
-		log.Printf("key [%s]  value [%s]", k, v)
-		query["$or"] = []bson.M{bson.M{"groupId": v}, bson.M{"_groupId": v, "_active": true}}
+	for _, v := range details.Where {
+		log.Printf("value [%s]", v)
+		query = bson.M{"$or": []bson.M{bson.M{"groupId": v}, bson.M{"_groupId": v, "_active": true}}}
 	}
 
-	log.Printf("where clause will be [%v]", query)
+	typesIn = bson.M{}
 
 	for i := range details.Types {
 		typesIn[details.Types[i]] = 1
 	}
 
-	log.Printf("will include feilds [%v]", typesIn)
-
 	return query, typesIn
 }
 
-func (d MongoStoreClient) ExecuteQuery(details model.QueryData) []byte {
+func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	mongoSession := d.session.Copy()
 	var result map[string]interface{}
 	var sortField = ""

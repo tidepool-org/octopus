@@ -5,9 +5,11 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"labix.org/v2/mgo"
-
 	"github.com/tidepool-org/go-common/clients/mongo"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
+
+	"../model"
 )
 
 func TestMongoStore(t *testing.T) {
@@ -42,4 +44,36 @@ func TestMongoStore(t *testing.T) {
 	} else {
 		t.Fatalf("wtf - failed parsing the config %v", err)
 	}
+}
+
+func TestQueryConstruction(t *testing.T) {
+
+	qd := &model.QueryData{
+		Where:   map[string]string{"userid": "1234"},
+		Types:   []string{"cbg", "smbg"},
+		Sort:    map[string]string{"time": "myTime"},
+		Reverse: false,
+	}
+
+	q, in := constructQuery(qd)
+
+	if in["cbg"] == nil {
+		t.Fatalf("should include cbg [%v]", in)
+	}
+	if in["smbg"] == nil {
+		t.Fatalf("should include smbg [%v]", in)
+	}
+
+	groupWhere := q["$or"].([]bson.M)[0]
+
+	if groupWhere["groupId"] != "1234" {
+		t.Fatalf("groupId [%v] should have been set to given 1234", groupWhere)
+	}
+
+	_groupWhere := q["$or"].([]bson.M)[1]
+
+	if _groupWhere["_groupId"] != "1234" {
+		t.Fatalf("_groupId [%v] should have been set to given 1234", _groupWhere)
+	}
+
 }
