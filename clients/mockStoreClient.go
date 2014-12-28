@@ -2,6 +2,8 @@ package clients
 
 import (
 	"errors"
+
+	"../model"
 )
 
 type MockStoreClient struct {
@@ -29,4 +31,8 @@ func (d MockStoreClient) GetTimeLastEntryUser(deviceId string) []byte {
 
 func (d MockStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte {
 	return []byte("GetTimeLastEntryUserDevice")
+}
+
+func (d MockStoreClient) ExecuteQuery(details model.QueryData) []byte {
+	return []byte("ExecuteQuery")
 }

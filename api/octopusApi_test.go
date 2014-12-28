@@ -11,8 +11,6 @@ import (
 
 	"github.com/gorilla/mux"
 	commonClients "github.com/tidepool-org/go-common/clients"
-	//"github.com/tidepool-org/go-common/clients/disc"
-	//"github.com/tidepool-org/go-common/clients/mongo"
 	"github.com/tidepool-org/go-common/clients/shoreline"
 
 	"./../clients"
@@ -140,30 +138,6 @@ func TestOctopusResponds(t *testing.T) {
 			url:      "/upload/lastentry/" + FAKE_USER_ID + "/123-my-device-id",
 			respCode: http.StatusOK,
 			token:    FAKE_TOKEN,
-		},
-		{
-			// always returns a 200 if properly formed
-			method:   "POST",
-			url:      "/query",
-			respCode: http.StatusNotImplemented,
-			token:    FAKE_TOKEN,
-			body:     "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN update SORT BY time AS Timestamp REVERSED",
-		},
-		{
-			method:     "POST",
-			url:        "/query",
-			respCode:   http.StatusNotImplemented,
-			returnNone: true,
-			token:      FAKE_TOKEN,
-			body:       "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN cbg, smbg SORT BY time AS Timestamp REVERSED",
-		},
-		{
-			//no data given
-			method:   "POST",
-			url:      "/query",
-			respCode: http.StatusNotImplemented,
-			token:    FAKE_TOKEN,
-			body:     "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN foo SORT BY time AS Timestamp REVERSED",
 		},
 	}
 

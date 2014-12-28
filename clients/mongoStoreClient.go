@@ -7,6 +7,8 @@ import (
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
+
+	"../model"
 )
 
 const (
@@ -71,6 +73,25 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	fullQuery := bson.M{"$and": []bson.M{groupIdQuery, deviceIdQuery}}
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	c.Find(fullQuery).Sort("-time").One(&result)
+	bytes, err := json.Marshal(result["time"])
+	if err != nil {
+		log.Print("Failed to marshall event", result, err)
+	}
+	return bytes
+}
+
+func (d MongoStoreClient) constructQuery(details model.QueryData) (query bson.M) {
+	return query
+}
+
+func (d MongoStoreClient) ExecuteQuery(details model.QueryData) []byte {
+	mongoSession := d.session.Copy()
+	var result map[string]interface{}
+	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
+
+	query := bson.M{}
+	// Get the entry with the latest time by reverse sorting and taking the first value
+	c.Find(query).Sort("-time").One(&result)
 	bytes, err := json.Marshal(result["time"])
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
