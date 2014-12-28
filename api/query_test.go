@@ -49,7 +49,7 @@ func TestReverse_IgnoresCase(t *testing.T) {
 func TestWhere_GivesError_WhenNoWhere(t *testing.T) {
 	qd := &QueryData{}
 
-	noWhereErr, qd := qd.buildWhere("not right")
+	noWhereErr := qd.buildWhere("not right")
 
 	if noWhereErr.Error() != ERROR_WHERE_REQUIRED {
 		t.Fatalf("should give error when no WHERE is specified")
@@ -60,7 +60,7 @@ func TestWhere_GivesError_WhenNoWhere(t *testing.T) {
 func TestWhere_GivesError_WhenNoWhereIs(t *testing.T) {
 	qd := &QueryData{}
 
-	noWhereErr, qd := qd.buildWhere("METAQUERY WHERE userid QUERY TYPE IN update")
+	noWhereErr := qd.buildWhere("METAQUERY WHERE userid QUERY TYPE IN update")
 
 	if noWhereErr.Error() != ERROR_WHERE_IS_REQUIRED {
 		t.Fatalf("should give error when no IS  specified for WHERE clause")
@@ -89,7 +89,7 @@ func TestWhere(t *testing.T) {
 func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
 	qd := &QueryData{}
 
-	noTypesErr, _ := qd.buildTypes("METAQUERY WHERE userid QUERY")
+	noTypesErr := qd.buildTypes("METAQUERY WHERE userid QUERY")
 
 	if noTypesErr.Error() != ERROR_TYPES_REQUIRED {
 		t.Fatalf("should give error when no TYPE IN is specified")
@@ -116,6 +116,52 @@ func TestTypes(t *testing.T) {
 
 	if qd.Types[2] != "smbg" {
 		t.Fatalf("type should have been smbg but [%s]", qd.Types[2])
+	}
+
+}
+
+func TestSort_GivesError_WhenNoSortBy(t *testing.T) {
+	qd := &QueryData{}
+
+	noSortErr := qd.buildSort("QUERY TYPE IN update, cbg, smbg AS Timestamp REVERSED")
+
+	if noSortErr.Error() != ERROR_SORT_REQUIRED {
+		t.Fatalf("should give error when no TYPE IN is specified")
+	}
+
+}
+
+func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
+	qd := &QueryData{}
+
+	noSortAsErr := qd.buildSort("QUERY TYPE IN update, cbg, smbg SORT BY time")
+
+	if noSortAsErr.Error() != ERROR_SORT_AS_REQUIRED {
+		t.Fatalf("should give error when no TYPE IN is specified")
+	}
+
+}
+
+func TestExractQueryData(t *testing.T) {
+
+	errs, qd := extractQuery(VALID_QUERY)
+
+	if len(errs) != 0 {
+		t.Fatalf("there should be no errors")
+	}
+
+	if qd.Reverse != true {
+		t.Fatalf("should be reversed")
+	}
+
+}
+
+func TestExractQueryData_AccumulatesErrors(t *testing.T) {
+
+	errs, _ := extractQuery("blah blah")
+
+	if len(errs) != 3 {
+		t.Fatalf("there should be errors [%d]", len(errs))
 	}
 
 }
