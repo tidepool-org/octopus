@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	VALID_QUERY     = "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN update SORT BY time AS Timestamp REVERSED"
+	VALID_QUERY     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg SORT BY time AS Timestamp REVERSED"
 	IS_REVERSE      = "blah blah reversed"
 	IS_REVERSE_CASE = "blah blah REVERSED"
 	NOT_REVERSE     = "blah blah"
@@ -64,6 +64,58 @@ func TestWhere_GivesError_WhenNoWhereIs(t *testing.T) {
 
 	if noWhereErr.Error() != ERROR_WHERE_IS_REQUIRED {
 		t.Fatalf("should give error when no IS  specified for WHERE clause")
+	}
+
+}
+
+func TestWhere(t *testing.T) {
+
+	const userid, givenId = "userid", "12d7bc90fa"
+
+	qd := &QueryData{}
+
+	qd.buildWhere(VALID_QUERY)
+
+	if qd.Where[userid] == "" {
+		t.Fatalf("should be a userid set")
+	}
+
+	if qd.Where[userid] != givenId {
+		t.Fatalf("the user id should have been %s", givenId)
+	}
+
+}
+
+func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
+	qd := &QueryData{}
+
+	noTypesErr, _ := qd.buildTypes("METAQUERY WHERE userid QUERY")
+
+	if noTypesErr.Error() != ERROR_TYPES_REQUIRED {
+		t.Fatalf("should give error when no TYPE IN is specified")
+	}
+
+}
+
+func TestTypes(t *testing.T) {
+	qd := &QueryData{}
+
+	qd.buildTypes(VALID_QUERY)
+
+	if len(qd.Types) != 3 {
+		t.Fatalf("should listed the three types from query")
+	}
+
+	if qd.Types[0] != "update" {
+		t.Fatalf("type should have been update but [%s]", qd.Types[0])
+	}
+
+	if qd.Types[1] != "cbg" {
+		t.Fatalf("type should have been cbg but [%s]", qd.Types[1])
+	}
+
+	if qd.Types[2] != "smbg" {
+		t.Fatalf("type should have been smbg but [%s]", qd.Types[2])
 	}
 
 }

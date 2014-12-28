@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -11,9 +12,11 @@ const (
 
 	ERROR_WHERE_REQUIRED    = "Missing required WHERE e.g. WHERE userid IS 12d7bc90"
 	ERROR_WHERE_IS_REQUIRED = "Missing required IS e.g. WHERE userid IS 12d7bc90"
+	ERROR_TYPES_REQUIRED    = "Missing required TYPE IN e.g. TYPE IN cbg, smbg"
 
-	whereClause    = "METAQUERY WHERE"
+	whereClause    = "WHERE"
 	whereIsClause  = "IS"
+	spaceInClause  = " "
 	typeInClause   = "TYPE IN"
 	sortByClause   = "SORT BY"
 	sortByAsClause = "AS"
@@ -34,17 +37,38 @@ func (qd *QueryData) buildWhere(raw string) (error, *QueryData) {
 
 		if containsWhereIs := strings.Index(strings.ToUpper(raw), whereIsClause); containsWhereIs != -1 {
 
+			whereFieldName := strings.TrimSpace(raw[containsWhere+len(whereClause) : containsWhereIs])
+			queryStart := strings.Index(strings.ToUpper(raw), " QUERY")
+			whereFieldValue := strings.TrimSpace(raw[containsWhereIs+len(whereIsClause) : queryStart])
+
+			qd.Where = map[string]string{whereFieldName: whereFieldValue}
+
+			return nil, qd
+
 		} else {
+			log.Printf("buildWhere [%s] gives error [%s]", raw, ERROR_WHERE_IS_REQUIRED)
 			return errors.New(ERROR_WHERE_IS_REQUIRED), qd
 		}
 	} else {
+		log.Printf("buildWhere [%s] gives error [%s]", raw, ERROR_WHERE_IS_REQUIRED)
 		return errors.New(ERROR_WHERE_REQUIRED), qd
 	}
-	return nil, qd
 }
 
-func (qd *QueryData) buildTypes(raw string) *QueryData {
-	return qd
+func (qd *QueryData) buildTypes(raw string) (error, *QueryData) {
+	if containsTypes := strings.Index(strings.ToUpper(raw), typeInClause); containsTypes != -1 {
+
+		typesString := strings.TrimSpace(raw[containsTypes+len(typeInClause) : strings.Index(strings.ToUpper(raw), sortByClause)])
+
+		log.Printf("buildTypes %v", strings.Split(typesString, ", "))
+
+		qd.Types = strings.Split(typesString, ", ")
+
+		return nil, qd
+	} else {
+		log.Printf("buildTypes [%s] gives error [%s]", raw, ERROR_TYPES_REQUIRED)
+		return errors.New(ERROR_TYPES_REQUIRED), qd
+	}
 }
 
 func (qd *QueryData) buildSort(raw string) *QueryData {
