@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -16,13 +17,12 @@ const (
 	ERROR_SORT_AS_REQUIRED  = "Missing required AS e.g. SORT BY time AS Timestamp"
 	ERROR_TYPES_REQUIRED    = "Missing required TYPE IN e.g. TYPE IN cbg, smbg"
 
-	whereClause    = "WHERE"
-	whereIsClause  = "IS"
-	spaceInClause  = " "
-	typeInClause   = "TYPE IN"
-	sortByClause   = "SORT BY"
-	sortByAsClause = "AS"
-	reverseClause  = "REVERSED"
+	CLAUSE_WHERE    = "WHERE"
+	CLAUSE_WHERE_IS = "IS"
+	CLAUSE_TYPE_IN  = "TYPE IN"
+	CLAUSE_SORT     = "SORT BY"
+	CLAUSE_SORT_AS  = "AS"
+	CLAUSE_REVERSE  = "REVERSED"
 )
 
 type (
@@ -35,13 +35,13 @@ type (
 )
 
 func (qd *QueryData) buildWhere(raw string) error {
-	if containsWhere := strings.Index(strings.ToUpper(raw), whereClause); containsWhere != -1 {
+	if containsWhere := strings.Index(strings.ToUpper(raw), CLAUSE_WHERE); containsWhere != -1 {
 
-		if containsWhereIs := strings.Index(strings.ToUpper(raw), whereIsClause); containsWhereIs != -1 {
+		if containsWhereIs := strings.Index(strings.ToUpper(raw), CLAUSE_WHERE_IS); containsWhereIs != -1 {
 
-			whereFieldName := strings.TrimSpace(raw[containsWhere+len(whereClause) : containsWhereIs])
+			whereFieldName := strings.TrimSpace(raw[containsWhere+len(CLAUSE_WHERE) : containsWhereIs])
 			queryStart := strings.Index(strings.ToUpper(raw), " QUERY")
-			whereFieldValue := strings.TrimSpace(raw[containsWhereIs+len(whereIsClause) : queryStart])
+			whereFieldValue := strings.TrimSpace(raw[containsWhereIs+len(CLAUSE_WHERE_IS) : queryStart])
 
 			qd.Where = map[string]string{whereFieldName: whereFieldValue}
 
@@ -58,9 +58,9 @@ func (qd *QueryData) buildWhere(raw string) error {
 }
 
 func (qd *QueryData) buildTypes(raw string) error {
-	if containsTypes := strings.Index(strings.ToUpper(raw), typeInClause); containsTypes != -1 {
+	if containsTypes := strings.Index(strings.ToUpper(raw), CLAUSE_TYPE_IN); containsTypes != -1 {
 
-		typesString := strings.TrimSpace(raw[containsTypes+len(typeInClause) : strings.Index(strings.ToUpper(raw), sortByClause)])
+		typesString := strings.TrimSpace(raw[containsTypes+len(CLAUSE_TYPE_IN) : strings.Index(strings.ToUpper(raw), CLAUSE_SORT)])
 
 		log.Printf("buildTypes %v", strings.Split(typesString, ", "))
 
@@ -74,14 +74,14 @@ func (qd *QueryData) buildTypes(raw string) error {
 }
 
 func (qd *QueryData) buildSort(raw string) error {
-	if containsSort := strings.Index(strings.ToUpper(raw), sortByClause); containsSort != -1 {
+	if containsSort := strings.Index(strings.ToUpper(raw), CLAUSE_SORT); containsSort != -1 {
 
-		if containsSortAs := strings.Index(strings.ToUpper(raw), sortByAsClause); containsSortAs != -1 {
+		if containsSortAs := strings.Index(strings.ToUpper(raw), CLAUSE_SORT_AS); containsSortAs != -1 {
 
-			sortFieldName := strings.TrimSpace(raw[containsSort+len(sortByClause) : containsSortAs])
-			if sortEnd := strings.Index(strings.ToUpper(raw), reverseClause); sortEnd != -1 {
+			sortFieldName := strings.TrimSpace(raw[containsSort+len(CLAUSE_SORT) : containsSortAs])
+			if sortEnd := strings.Index(strings.ToUpper(raw), CLAUSE_REVERSE); sortEnd != -1 {
 
-				sortAsValue := strings.TrimSpace(raw[containsSortAs+len(sortByAsClause) : sortEnd])
+				sortAsValue := strings.TrimSpace(raw[containsSortAs+len(CLAUSE_SORT_AS) : sortEnd])
 
 				qd.Sort = map[string]string{sortFieldName: sortAsValue}
 
@@ -103,7 +103,7 @@ func (qd *QueryData) buildSort(raw string) error {
 
 func (qd *QueryData) buildOrder(raw string) {
 
-	if contains := strings.Index(strings.ToUpper(raw), reverseClause); contains != -1 {
+	if contains := strings.Index(strings.ToUpper(raw), CLAUSE_REVERSE); contains != -1 {
 		qd.Reverse = true
 	} else {
 		qd.Reverse = false
@@ -133,6 +133,14 @@ func extractQuery(raw string) (parseErrs []error, qd *QueryData) {
 // http.StatusOK
 // http.StatusNotAcceptable
 func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
+
+	defer req.Body.Close()
+	var raw interface{}
+	if err := json.NewDecoder(req.Body).Decode(&raw); err != nil {
+		log.Printf("Query: error decoding query to parse %v\n", err)
+	}
+
+	log.Printf("req ", raw)
 
 	res.WriteHeader(http.StatusNotImplemented)
 	return
