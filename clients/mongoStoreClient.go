@@ -48,13 +48,12 @@ func (d MongoStoreClient) Ping() error {
 }
 
 func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
-	mongoSession := d.session.Copy()
+
 	var result map[string]interface{}
-	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
 	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
 		bson.M{"_groupId": groupId, "_active": true}}}
 	// Get the entry with the latest time by reverse sorting and taking the first value
-	c.Find(groupIdQuery).Sort("-time").One(&result)
+	d.deviceDataC.Find(groupIdQuery).Sort("-time").One(&result)
 	bytes, err := json.Marshal(result["time"])
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
@@ -63,16 +62,16 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
 }
 
 func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte {
-	mongoSession := d.session.Copy()
+
 	var result map[string]interface{}
-	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
+
 	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
 		bson.M{"_groupId": groupId, "_active": true}}}
 	deviceIdQuery := bson.M{"deviceId": deviceId}
 	// Full query matches groupId and deviceId
 	fullQuery := bson.M{"$and": []bson.M{groupIdQuery, deviceIdQuery}}
 	// Get the entry with the latest time by reverse sorting and taking the first value
-	c.Find(fullQuery).Sort("-time").One(&result)
+	d.deviceDataC.Find(fullQuery).Sort("-time").One(&result)
 	bytes, err := json.Marshal(result["time"])
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
@@ -80,45 +79,33 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	return bytes
 }
 
-func constructQuery(details *model.QueryData) (query bson.M, typesIn bson.M) {
-	//METAQUERY WHERE userid IS "12d7bc90fa"
-	//QUERY TYPE IN cbg, smbg, bolus, wizard WHERE time > starttime AND time < endtime SORT BY time AS Timestamp REVERSED
-
+func constructQuery(details *model.QueryData) (query bson.M, sort string) {
+	//query
 	for _, v := range details.Where {
 		log.Printf("constructQuery for [%s]", v)
-		query = bson.M{"$or": []bson.M{bson.M{"groupId": v}, bson.M{"_groupId": v, "_active": true}}}
+		query = bson.M{"$or": []bson.M{bson.M{"groupId": v, "type": bson.M{"$in": details.Types}}, bson.M{"_groupId": v, "_active": true, "type": bson.M{"$in": details.Types}}}}
 	}
-
-	typesIn = bson.M{}
-
-	for i := range details.Types {
-		typesIn[details.Types[i]] = 1
+	//sort
+	for k := range details.Sort {
+		sort = k
+		if details.Reverse {
+			sort = "-" + sort
+		}
 	}
-
-	return query, typesIn
+	return query, sort
 }
 
 func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
-	mongoSession := d.session.Copy()
-	var result map[string]interface{}
-	var sortField = ""
-	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
+	var results []interface{}
 
-	query, _ := constructQuery(details)
+	query, sort := constructQuery(details)
 
-	for k := range details.Sort {
-		sortField = k
-		if details.Reverse {
-			sortField = "-" + sortField
-		}
-	}
+	log.Printf("ExecuteQuery query[%v] sort[%s]", query, sort)
 
-	log.Printf("sort by [%s]", sortField)
-
-	c.Find(query).Sort(sortField).One(&result)
-	bytes, err := json.Marshal(result)
+	d.deviceDataC.Find(query).Sort(sort).All(&results)
+	bytes, err := json.Marshal(results)
 	if err != nil {
-		log.Print("Failed to marshall event", result, err)
+		log.Print("Failed to marshall event", results, err)
 	}
 	return bytes
 }

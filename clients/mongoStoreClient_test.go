@@ -57,25 +57,30 @@ func TestMongoStore(t *testing.T) {
 
 func TestQueryConstruction(t *testing.T) {
 
-	q, in := constructQuery(qd)
+	query, sort := constructQuery(qd)
 
-	if in["cbg"] == nil {
-		t.Fatalf("should include cbg [%v]", in)
-	}
-	if in["smbg"] == nil {
-		t.Fatalf("should include smbg [%v]", in)
+	if sort != "time" {
+		t.Fatalf("sort returned [%s] but should be time", sort)
 	}
 
-	groupWhere := q["$or"].([]bson.M)[0]
+	groupWhere := query["$or"].([]bson.M)[0]
 
 	if groupWhere["groupId"] != "1234" {
 		t.Fatalf("groupId [%v] should have been set to given 1234", groupWhere)
 	}
 
-	_groupWhere := q["$or"].([]bson.M)[1]
+	if groupWhere["type"] == nil {
+		t.Fatalf("type should have two items [%v]", groupWhere["type"])
+	}
+
+	_groupWhere := query["$or"].([]bson.M)[1]
 
 	if _groupWhere["_groupId"] != "1234" {
 		t.Fatalf("_groupId [%v] should have been set to given 1234", _groupWhere)
+	}
+
+	if _groupWhere["type"] == nil {
+		t.Fatalf("type should have two items [%v]", _groupWhere["type"])
 	}
 
 }
