@@ -85,7 +85,7 @@ func constructQuery(details *model.QueryData) (query bson.M, typesIn bson.M) {
 	//QUERY TYPE IN cbg, smbg, bolus, wizard WHERE time > starttime AND time < endtime SORT BY time AS Timestamp REVERSED
 
 	for _, v := range details.Where {
-		log.Printf("value [%s]", v)
+		log.Printf("constructQuery for [%s]", v)
 		query = bson.M{"$or": []bson.M{bson.M{"groupId": v}, bson.M{"_groupId": v, "_active": true}}}
 	}
 
@@ -104,7 +104,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	var sortField = ""
 	c := mongoSession.DB("").C(DEVICE_DATA_COLLECTION)
 
-	query, inTypes := constructQuery(details)
+	query, _ := constructQuery(details)
 
 	for k := range details.Sort {
 		sortField = k
@@ -115,7 +115,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 
 	log.Printf("sort by [%s]", sortField)
 
-	c.Find([]bson.M{query, inTypes}).Sort(sortField).One(&result)
+	c.Find(query).Sort(sortField).One(&result)
 	bytes, err := json.Marshal(result)
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
