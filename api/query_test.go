@@ -16,14 +16,14 @@ func TestQueryResponds(t *testing.T) {
 		{
 			// always returns a 200 if properly formed
 			method:   "POST",
-			url:      "/query",
+			url:      "/data",
 			respCode: http.StatusOK,
 			token:    FAKE_TOKEN,
 			body:     "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update SORT BY time AS Timestamp REVERSED",
 		},
 		{
 			method:     "POST",
-			url:        "/query",
+			url:        "/data",
 			respCode:   http.StatusOK,
 			returnNone: true,
 			token:      FAKE_TOKEN,
@@ -32,14 +32,14 @@ func TestQueryResponds(t *testing.T) {
 		{
 			//no query given
 			method:   "POST",
-			url:      "/query",
+			url:      "/data",
 			respCode: http.StatusBadRequest,
 			token:    FAKE_TOKEN,
 		},
 		{
 			//invalid query given
 			method:   "POST",
-			url:      "/query",
+			url:      "/data",
 			respCode: http.StatusBadRequest,
 			token:    FAKE_TOKEN,
 			body:     "blah balh blah",

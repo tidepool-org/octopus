@@ -94,7 +94,7 @@ func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 	rtr.HandleFunc("/status", a.GetStatus).Methods("GET")
 	rtr.Handle("/upload/lastentry/{userID}", varsHandler(a.TimeLastEntryUser)).Methods("GET")
 	rtr.Handle("/upload/lastentry/{userID}/{deviceID}", varsHandler(a.TimeLastEntryUserAndDevice)).Methods("GET")
-	rtr.HandleFunc("/query", a.Query).Methods("POST")
+	rtr.HandleFunc("/data", a.Query).Methods("POST")
 }
 
 func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
