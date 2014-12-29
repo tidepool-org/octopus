@@ -242,17 +242,3 @@ func TestTimeLastEntryUserAndDevice_NilToken_StatusForbidden(t *testing.T) {
 		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
 	}
 }
-
-func TestQuery_Status(t *testing.T) {
-	var jsonData = []byte(`"METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update SORT BY time AS Timestamp REVERSED"`)
-
-	req, _ := http.NewRequest("POST", "/query", bytes.NewBuffer(jsonData))
-	req.Header.Add("content-type", "application/json")
-
-	res := httptest.NewRecorder()
-
-	octopus.Query(res, req)
-	if res.Code != http.StatusNotImplemented {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusNotImplemented)
-	}
-}

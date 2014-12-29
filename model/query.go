@@ -110,7 +110,7 @@ func (qd *QueryData) buildOrder(raw string) {
 }
 
 //e.g. "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN update SORT BY time AS Timestamp REVERSED",
-func extractQuery(raw string) (parseErrs []error, qd *QueryData) {
+func ExtractQuery(raw string) (parseErrs []error, qd *QueryData) {
 
 	qd = &QueryData{}
 

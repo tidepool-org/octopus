@@ -1,9 +1,11 @@
 package api
 
 import (
-	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
+
+	"../model"
 )
 
 const (
@@ -11,17 +13,35 @@ const (
 )
 
 // http.StatusOK
-// http.StatusNotAcceptable
+// http.StatusBadRequest
 func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 	defer req.Body.Close()
-	var raw interface{}
-	if err := json.NewDecoder(req.Body).Decode(&raw); err != nil {
-		log.Printf("Query: error decoding query to parse %v\n", err)
+	if rawQuery, err := ioutil.ReadAll(req.Body); err != nil {
+		log.Printf("Query - err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body)
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	} else {
+		query := string(rawQuery)
+		log.Printf("Query - raw [%s] ", query)
+
+		if errs, qd := model.ExtractQuery(query); len(errs) != 0 {
+
+			log.Printf("Query - errors [%v] found parsing raw query [%s]", errs, query)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+
+		} else {
+
+			log.Printf("Query data used [%v]", qd)
+
+			result := a.Store.ExecuteQuery(qd)
+
+			log.Printf("Query results [%s]", string(result))
+
+			res.WriteHeader(http.StatusOK)
+			res.Write(result)
+			return
+		}
 	}
-
-	log.Printf("req ", raw)
-
-	res.WriteHeader(http.StatusNotImplemented)
-	return
 }

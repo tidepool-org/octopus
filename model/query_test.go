@@ -144,7 +144,7 @@ func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
 
 func TestExractQueryData(t *testing.T) {
 
-	errs, qd := extractQuery(VALID_QUERY)
+	errs, qd := ExtractQuery(VALID_QUERY)
 
 	if len(errs) != 0 {
 		t.Fatalf("there should be no errors")
@@ -158,7 +158,7 @@ func TestExractQueryData(t *testing.T) {
 
 func TestExractQueryData_AccumulatesErrors(t *testing.T) {
 
-	errs, _ := extractQuery("blah blah")
+	errs, _ := ExtractQuery("blah blah")
 
 	if len(errs) != 3 {
 		t.Fatalf("there should be errors [%d]", len(errs))

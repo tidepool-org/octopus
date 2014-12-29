@@ -17,25 +17,32 @@ func TestQueryResponds(t *testing.T) {
 			// always returns a 200 if properly formed
 			method:   "POST",
 			url:      "/query",
-			respCode: http.StatusNotImplemented,
+			respCode: http.StatusOK,
 			token:    FAKE_TOKEN,
-			body:     "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN update SORT BY time AS Timestamp REVERSED",
+			body:     "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update SORT BY time AS Timestamp REVERSED",
 		},
 		{
 			method:     "POST",
 			url:        "/query",
-			respCode:   http.StatusNotImplemented,
+			respCode:   http.StatusOK,
 			returnNone: true,
 			token:      FAKE_TOKEN,
-			body:       "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN cbg, smbg SORT BY time AS Timestamp REVERSED",
+			body:       "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg, smbg SORT BY time AS Timestamp REVERSED",
 		},
 		{
-			//no data given
+			//no query given
 			method:   "POST",
 			url:      "/query",
-			respCode: http.StatusNotImplemented,
+			respCode: http.StatusBadRequest,
 			token:    FAKE_TOKEN,
-			body:     "METAQUERY WHERE userid IS \"12d7bc90fa\" QUERY TYPE IN foo SORT BY time AS Timestamp REVERSED",
+		},
+		{
+			//invalid query given
+			method:   "POST",
+			url:      "/query",
+			respCode: http.StatusBadRequest,
+			token:    FAKE_TOKEN,
+			body:     "blah balh blah",
 		},
 	}
 
@@ -82,19 +89,5 @@ func TestQueryResponds(t *testing.T) {
 				t.Fatalf("Test %d url: '%s'\n\t%s\n", idx, test.url, cmp)
 			}
 		}
-	}
-}
-
-func TestQuery(t *testing.T) {
-	var jsonData = []byte(`"METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update SORT BY time AS Timestamp REVERSED"`)
-
-	req, _ := http.NewRequest("POST", "/query", bytes.NewBuffer(jsonData))
-	req.Header.Add("content-type", "application/json")
-
-	res := httptest.NewRecorder()
-
-	octopus.Query(res, req)
-	if res.Code != http.StatusNotImplemented {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusNotImplemented)
 	}
 }
