@@ -9,5 +9,8 @@ tp_logon() {
 }
 
 tp_query() {
+
+    #DEFAULT_QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN cbg, smbg, bolus, wizard SORT BY time AS Timestamp REVERSED"
+
     curl -X POST -d "METAQUERY WHERE userid IS $1 QUERY TYPE IN cbg, smbg, bolus, wizard SORT BY time AS Timestamp REVERSED" https://devel-api.tidepool.io/query/data --header "Content-Type:application/json"
 }

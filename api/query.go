@@ -8,13 +8,16 @@ import (
 	"../model"
 )
 
-const (
-	QUERY_NOT_PARSED = "Query could not be parsed"
-)
-
 // http.StatusOK
 // http.StatusBadRequest
+// http.StatusUnauthorized
 func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
+
+	if td := a.ShorelineClient.CheckToken(req.Header.Get(SESSION_TOKEN)); td == nil {
+		log.Printf("Query - Failed authorization")
+		res.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	defer req.Body.Close()
 	if rawQuery, err := ioutil.ReadAll(req.Body); err != nil {
