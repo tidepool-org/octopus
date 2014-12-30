@@ -14,10 +14,11 @@ import (
 
 var (
 	qd = &model.QueryData{
-		Where:   map[string]string{"userid": "1234"},
-		Types:   []string{"cbg", "smbg"},
-		Sort:    map[string]string{"time": "myTime"},
-		Reverse: false,
+		MetaQuery:      map[string]string{"userid": "1234"},
+		WhereConditons: []model.WhereCondition{},
+		Types:          []string{"cbg", "smbg"},
+		Sort:           map[string]string{"time": "myTime"},
+		Reverse:        false,
 	}
 )
 
