@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	VALID_QUERY     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg SORT BY time AS Timestamp REVERSED"
+	VALID_QUERY     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > starttime AND time < endtime SORT BY time AS Timestamp REVERSED"
 	IS_REVERSE      = "blah blah reversed"
 	IS_REVERSE_CASE = "blah blah REVERSED"
 	NOT_REVERSE     = "blah blah"
@@ -46,44 +46,79 @@ func TestReverse_IgnoresCase(t *testing.T) {
 
 }
 
-func TestWhere_GivesError_WhenNoWhere(t *testing.T) {
+func TestMetaQuery_GivesError_WhenNoWhere(t *testing.T) {
 	qd := &QueryData{}
 
-	noWhereErr := qd.buildWhere("not right")
+	noWhereErr := qd.buildMetaQuery("not right")
 
-	if noWhereErr.Error() != ERROR_WHERE_REQUIRED {
-		t.Fatalf("should give error when no WHERE is specified")
+	if noWhereErr.Error() != ERROR_METAQUERY_REQUIRED {
+		t.Fatalf("got err [%s] expected err [%s]", noWhereErr.Error(), ERROR_METAQUERY_REQUIRED)
 	}
 
 }
 
-func TestWhere_GivesError_WhenNoWhereIs(t *testing.T) {
+func TestMetaQuery_GivesError_WhenNoWhereIs(t *testing.T) {
 	qd := &QueryData{}
 
-	noWhereErr := qd.buildWhere("METAQUERY WHERE userid QUERY TYPE IN update")
+	noWhereErr := qd.buildMetaQuery("METAQUERY WHERE userid QUERY TYPE IN update")
 
-	if noWhereErr.Error() != ERROR_WHERE_IS_REQUIRED {
-		t.Fatalf("should give error when no IS  specified for WHERE clause")
+	if noWhereErr.Error() != ERROR_METAQUERY_REQUIRED {
+		t.Fatalf("got err [%s] expected err [%s]", noWhereErr.Error(), ERROR_METAQUERY_REQUIRED)
 	}
 
 }
 
-func TestWhere(t *testing.T) {
+func TestMetaQueryWhere(t *testing.T) {
 
 	const userid, givenId = "userid", "12d7bc90fa"
 
 	qd := &QueryData{}
 
+	qd.buildMetaQuery(VALID_QUERY)
+
+	if qd.MetaQuery[userid] == "" {
+		t.Fatalf("should be a userid set on [%v]", qd.MetaQuery)
+	}
+
+	if qd.MetaQuery[userid] != givenId {
+		t.Fatalf("the user id should have been %s, on [%v]", givenId, qd.MetaQuery)
+	}
+
+}
+
+func TestQueryWhere_GivesNoError_WhenNoWhereStatement(t *testing.T) {
+	qd := &QueryData{}
+
+	noWhereErr := qd.buildWhere("METAQUERY WHERE userid QUERY TYPE IN update")
+
+	if noWhereErr != nil {
+		t.Fatalf("got err [%s] but expected none", noWhereErr.Error())
+	}
+
+}
+
+func TestQueryWhere(t *testing.T) {
+
+	//WHERE time > starttime AND time < endtime
+
+	qd := &QueryData{}
+
 	qd.buildWhere(VALID_QUERY)
 
-	if qd.Where[userid] == "" {
-		t.Fatalf("should be a userid set")
+	if len(qd.WhereConditons) != 2 {
+		t.Fatalf("there should be two where conditions got %v", qd.WhereConditons)
 	}
 
-	if qd.Where[userid] != givenId {
-		t.Fatalf("the user id should have been %s", givenId)
+	first := qd.WhereConditons[0]
+	second := qd.WhereConditons[1]
+
+	if first.Name != "time" || first.Condition != ">" || first.Value != "starttime" {
+		t.Fatalf("first where  %v doesn't match ", first)
 	}
 
+	if second.Name != "time" || second.Condition != "<" || second.Value != "endtime" {
+		t.Fatalf("second where  %v doesn't match ", second)
+	}
 }
 
 func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
@@ -92,7 +127,7 @@ func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
 	noTypesErr := qd.buildTypes("METAQUERY WHERE userid QUERY")
 
 	if noTypesErr.Error() != ERROR_TYPES_REQUIRED {
-		t.Fatalf("should give error when no TYPE IN is specified")
+		t.Fatalf("got err [%s] expected err [%s]", noTypesErr.Error(), ERROR_TYPES_REQUIRED)
 	}
 
 }
@@ -103,7 +138,7 @@ func TestTypes(t *testing.T) {
 	qd.buildTypes(VALID_QUERY)
 
 	if len(qd.Types) != 3 {
-		t.Fatalf("should listed the three types from query")
+		t.Fatalf("should listed the three types from query got [%v]", qd.Types)
 	}
 
 	if qd.Types[0] != "update" {
@@ -126,7 +161,7 @@ func TestSort_GivesError_WhenNoSortBy(t *testing.T) {
 	noSortErr := qd.buildSort("QUERY TYPE IN update, cbg, smbg AS Timestamp REVERSED")
 
 	if noSortErr.Error() != ERROR_SORT_REQUIRED {
-		t.Fatalf("should give error when no TYPE IN is specified")
+		t.Fatalf("got err [%s] expected err [%s]", noSortErr.Error(), ERROR_SORT_REQUIRED)
 	}
 
 }
@@ -137,7 +172,7 @@ func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
 	noSortAsErr := qd.buildSort("QUERY TYPE IN update, cbg, smbg SORT BY time")
 
 	if noSortAsErr.Error() != ERROR_SORT_AS_REQUIRED {
-		t.Fatalf("should give error when no TYPE IN is specified")
+		t.Fatalf("got err [%s] expected err [%s]", noSortAsErr.Error(), ERROR_SORT_AS_REQUIRED)
 	}
 
 }
@@ -147,7 +182,7 @@ func TestExractQueryData(t *testing.T) {
 	errs, qd := ExtractQuery(VALID_QUERY)
 
 	if len(errs) != 0 {
-		t.Fatalf("there should be no errors")
+		t.Fatalf("there should be no errors but got %v", errs)
 	}
 
 	if qd.Reverse != true {
