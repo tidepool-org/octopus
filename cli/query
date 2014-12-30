@@ -1,0 +1,13 @@
+# This file should be run with 'source' (also known as '.' on linux/macs).
+#
+# It starts all the services for Tidepool on localhost.
+# It expects to be run from a top-level directory with checkouts of various
+
+
+tp_logon() {
+    echo "logging as $1"
+}
+
+tp_query() {
+    curl -X POST -d "METAQUERY WHERE userid IS $1 QUERY TYPE IN cbg, smbg, bolus, wizard SORT BY time AS Timestamp REVERSED" https://devel-api.tidepool.io/query/data --header "Content-Type:application/json"
+}

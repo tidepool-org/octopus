@@ -14,5 +14,5 @@ This is basic tool for executing the query endpoint on octopus
 ### Example
 
 ```
-go run cli/cli.go -w 7e881aec8f -t smbg
+go run cli/query.go -w 7e881aec8f -t smbg
 ```
