@@ -1,16 +1,38 @@
 # This file should be run with 'source' (also known as '.' on linux/macs).
 #
-# It starts all the services for Tidepool on localhost.
-# It expects to be run from a top-level directory with checkouts of various
+# It allows the user to login and then query data via the octopus query endpoint
 
+DEFAULT_ENV="https://devel-api.tidepool.io/"
+SESSION_TOKEN=""
 
+# Login to the tidepool-platfrom and get a session-token
 tp_logon() {
-    echo "logging as $1"
+    SESSION_TOKEN=$(curl -s -X POST -I -u $1 $DEFAULT_ENV/auth/login | grep x-tidepool-session-token)
+    echo $SESSION_TOKEN
 }
 
+# Run the data query for a given user id
 tp_query() {
 
-    #DEFAULT_QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN cbg, smbg, bolus, wizard SORT BY time AS Timestamp REVERSED"
+    QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN $QUERY_TYPES SORT BY time AS Timestamp REVERSED"
+    QUERY_TYPES="cbg, smbg, bolus, wizard"
 
-    curl -X POST -d "METAQUERY WHERE userid IS $1 QUERY TYPE IN cbg, smbg, bolus, wizard SORT BY time AS Timestamp REVERSED" https://devel-api.tidepool.io/query/data --header "Content-Type:application/json"
+    # are you logged in?
+    if [ -z "$SESSION_TOKEN" ]; then
+        echo "please login first i.e. tp_logon <username>"
+        return
+    fi
+    # do we have a user id for us to query?
+    if [ -z "$1" ]; then
+        echo "we need the id of the user whose data you are querying i.e. tp_query <userid>"
+        return
+    fi
+    # do you want to specify different types to query for?
+    if [ -n "$2" ]; then
+        echo "setting types to query as $2"
+        QUERY_TYPES=$2
+    fi
+
+    # get it done
+    curl -X POST -d "$QUERY" $DEFAULT_ENV/query/data --header "Content-Type:application/json"
 }
