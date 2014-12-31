@@ -8,7 +8,19 @@ SESSION_TOKEN=""
 # Login to the tidepool-platfrom and get a session-token
 tp_logon() {
     SESSION_TOKEN=$(curl -s -X POST -I -u $1 $DEFAULT_ENV/auth/login | grep x-tidepool-session-token)
-    echo $SESSION_TOKEN
+
+    # are you logged in?
+    if [ -z "$SESSION_TOKEN" ]; then
+        echo "something went wrong trying to login. Did you do tp_logon <username>?"
+        return
+    fi
+    echo "Your now logged in"
+}
+
+# Logout by clearing the token we are storing
+tp_logout() {
+    SESSION_TOKEN=""
+    echo "You have now logged out"
 }
 
 # Run the data query for a given user id
