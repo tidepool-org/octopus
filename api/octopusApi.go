@@ -61,20 +61,30 @@ func (a *Api) userCanViewData(userID, groupID string) bool {
 	return !(perms["root"] == nil && perms["view"] == nil)
 }
 
+//find and validate the token
+func (a *Api) authorized(req *http.Request) bool {
+	if token := req.Header.Get(SESSION_TOKEN); token != "" {
+		if td := a.ShorelineClient.CheckToken(token); td == nil {
+			return false
+		}
+		//all good!
+		return true
+	}
+	return false
+}
+
 func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request, vars httpVars) (string, error) {
 	userID := vars["userID"]
 
-	if td := a.ShorelineClient.CheckToken(req.Header.Get(SESSION_TOKEN)); td == nil || !(td.IsServer || a.userCanViewData(td.UserID, userID)) {
-		res.WriteHeader(http.StatusForbidden)
-		return "fail", errors.New("Forbidden")
+	if a.authorized(req) {
+		if pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
+			res.WriteHeader(http.StatusInternalServerError)
+			return "", errors.New("Internal server error")
+		} else {
+			return pair.ID, nil
+		}
 	}
-
-	if pair := a.SeagullClient.GetPrivatePair(userID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
-		res.WriteHeader(http.StatusInternalServerError)
-		return "fail", errors.New("Internal server error")
-	} else {
-		return pair.ID, nil
-	}
+	return "", errors.New("Forbidden")
 }
 
 func InitApi(cfg Config, slc ShorelineInterface,
