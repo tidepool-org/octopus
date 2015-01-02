@@ -83,7 +83,7 @@ func (qd *QueryData) buildWhere(raw string) error {
 				WhereCondition{
 					Name:      queryParts[whereIndex+1],
 					Condition: queryParts[whereIndex+2],
-					Value:     queryParts[whereIndex+3],
+					Value:     strings.ToUpper(queryParts[whereIndex+3]),
 				})
 
 			//do we also have an and?
@@ -93,7 +93,7 @@ func (qd *QueryData) buildWhere(raw string) error {
 					WhereCondition{
 						Name:      queryParts[andIndex+1],
 						Condition: queryParts[andIndex+2],
-						Value:     queryParts[andIndex+3],
+						Value:     strings.ToUpper(queryParts[andIndex+3]),
 					})
 			}
 		}

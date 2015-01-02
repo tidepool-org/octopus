@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	VALID_QUERY     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > starttime AND time < endtime SORT BY time AS Timestamp REVERSED"
+	VALID_QUERY     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
 	IS_REVERSE      = "blah blah reversed"
 	IS_REVERSE_CASE = "blah blah REVERSED"
 	NOT_REVERSE     = "blah blah"
@@ -112,11 +112,11 @@ func TestQueryWhere(t *testing.T) {
 	first := qd.WhereConditons[0]
 	second := qd.WhereConditons[1]
 
-	if first.Name != "time" || first.Condition != ">" || first.Value != "starttime" {
+	if first.Name != "time" || first.Condition != ">" || first.Value != "2015-01-01T00:00:00.000Z" {
 		t.Fatalf("first where  %v doesn't match ", first)
 	}
 
-	if second.Name != "time" || second.Condition != "<" || second.Value != "endtime" {
+	if second.Name != "time" || second.Condition != "<" || second.Value != "2015-01-01T01:00:00.000Z" {
 		t.Fatalf("second where  %v doesn't match ", second)
 	}
 }

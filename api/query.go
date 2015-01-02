@@ -35,6 +35,13 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 			} else {
 
+				if pair := a.SeagullClient.GetPrivatePair(qd.MetaQuery["userid"], "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
+					res.WriteHeader(http.StatusInternalServerError)
+					return
+				} else {
+					qd.MetaQuery["userid"] = pair.ID
+				}
+
 				log.Printf("Query: data used [%v]", qd)
 
 				result := a.Store.ExecuteQuery(qd)
