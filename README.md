@@ -51,7 +51,7 @@ The following queries are written as if they were using [TQL](http://developer.t
 Query to get all of a user’s update records:
 
     METAQUERY
-        WHERE userid IS "12d7bc90fa"
+        WHERE userid IS 12d7bc90fa
 
     QUERY
         TYPE IN update
@@ -60,7 +60,7 @@ Query to get all of a user’s update records:
 Query to get a block of records in a given time range:
 
     METAQUERY
-        WHERE userid IS "12d7bc90fa"
+        WHERE userid IS 12d7bc90fa
 
     QUERY
         TYPE IN cbg, smbg, bolus, wizard
