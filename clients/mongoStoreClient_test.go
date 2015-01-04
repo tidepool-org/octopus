@@ -3,10 +3,11 @@ package clients
 import (
 	"encoding/json"
 	"io/ioutil"
+	"reflect"
 	"testing"
 
 	"github.com/tidepool-org/go-common/clients/mongo"
-	"labix.org/v2/mgo"
+	//"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 
 	"../model"
@@ -15,7 +16,7 @@ import (
 var (
 	qd = &model.QueryData{
 		MetaQuery:      map[string]string{"userid": "1234"},
-		WhereConditons: []model.WhereCondition{},
+		WhereConditons: []model.WhereCondition{model.WhereCondition{Name: "Stuff", Value: "123", Condition: ">"}},
 		Types:          []string{"cbg", "smbg"},
 		Sort:           map[string]string{"time": "myTime"},
 		Reverse:        false,
@@ -38,18 +39,7 @@ func TestMongoStore(t *testing.T) {
 			t.Fatalf("We could not load the config ", err)
 		}
 
-		mc := NewMongoStoreClient(config.Mongo)
-
-		/*
-		 * INIT THE TEST - we use a clean copy of the collection before we start
-		 */
-
-		//drop it like its hot
-		mc.deviceDataC.DropCollection()
-
-		if err := mc.deviceDataC.Create(&mgo.CollectionInfo{}); err != nil {
-			t.Fatalf("We couldn't created the users collection for these tests ", err)
-		}
+		//NewMongoStoreClient(config.Mongo)
 
 	} else {
 		t.Fatalf("wtf - failed parsing the config %v", err)
@@ -64,24 +54,38 @@ func TestQueryConstruction(t *testing.T) {
 		t.Fatalf("sort returned [%s] but should be time", sort)
 	}
 
-	groupWhere := query["$or"].([]bson.M)[0]
+	//check the meta query
+	meta := query["$or"].([]bson.M)[0]
 
-	if groupWhere["groupId"] != "1234" {
-		t.Fatalf("groupId [%v] should have been set to given 1234", groupWhere)
+	if meta["groupId"] != "1234" {
+		t.Fatalf("groupId [%v] should have been set to given 1234", meta)
 	}
 
-	if groupWhere["type"] == nil {
-		t.Fatalf("type should have two items [%v]", groupWhere["type"])
+	//check the types
+	types := meta["type"]
+	expectedTypes := bson.M{"$in": []string{"cbg", "smbg"}}
+
+	if reflect.DeepEqual(types, expectedTypes) != true {
+		t.Fatalf("given %v but expected %v", types, expectedTypes)
 	}
 
-	_groupWhere := query["$or"].([]bson.M)[1]
+	//check the where condition
+	where := meta["Stuff"]
+	expectedWhere := bson.M{"$gt": "123"}
 
-	if _groupWhere["_groupId"] != "1234" {
-		t.Fatalf("_groupId [%v] should have been set to given 1234", _groupWhere)
+	if reflect.DeepEqual(where, expectedWhere) != true {
+		t.Fatalf("given %v but expected %v", where, expectedWhere)
 	}
 
-	if _groupWhere["type"] == nil {
-		t.Fatalf("type should have two items [%v]", _groupWhere["type"])
+	//check the other $or component of the query
+	_meta := query["$or"].([]bson.M)[1]
+
+	if _meta["_groupId"] != "1234" {
+		t.Fatalf("_groupId [%v] should have been set to given 1234", _meta)
+	}
+
+	if _meta["type"] == nil {
+		t.Fatalf("type should have two items [%v]", _meta["type"])
 	}
 
 }

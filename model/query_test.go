@@ -121,6 +121,30 @@ func TestQueryWhere(t *testing.T) {
 	}
 }
 
+func TestQueryWhere_Gte(t *testing.T) {
+
+	const GTE_QUERY = "QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z AND time <= 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
+
+	qd := &QueryData{}
+
+	qd.buildWhere(GTE_QUERY)
+
+	if len(qd.WhereConditons) != 2 {
+		t.Fatalf("there should be two where conditions got %v", qd.WhereConditons)
+	}
+
+	first := qd.WhereConditons[0]
+	second := qd.WhereConditons[1]
+
+	if first.Name != "time" || first.Condition != ">=" || first.Value != "2015-01-01T00:00:00.000Z" {
+		t.Fatalf("first where  %v doesn't match ", first)
+	}
+
+	if second.Name != "time" || second.Condition != "<=" || second.Value != "2015-01-01T01:00:00.000Z" {
+		t.Fatalf("second where  %v doesn't match ", second)
+	}
+}
+
 func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
 	qd := &QueryData{}
 
