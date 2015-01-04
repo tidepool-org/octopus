@@ -2,7 +2,7 @@
 #
 # It allows the user to login and then query data via the octopus query endpoint
 
-DEFAULT_ENV="https://devel-api.tidepool.io"
+DEFAULT_ENV="http://localhost:8009"
 SESSION_TOKEN=""
 
 # Login to the tidepool-platfrom and get a session-token
@@ -37,15 +37,21 @@ tp_query() {
         echo "we need the id of the user whose data you are querying i.e. tp_query <userid>"
         return
     fi
+    
     # do you want to specify different types to query for?
+
+    QUERY_TYPES="cbg, smbg, bolus, wizard"
+
     if [ -n "$2" ]; then
         echo "setting types to query as $2"
         QUERY_TYPES=$2
     fi
 
     QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN $QUERY_TYPES SORT BY time AS Timestamp REVERSED"
-    QUERY_TYPES="cbg, smbg, bolus, wizard"
+
+    #echo $SESSION_TOKEN
 
     # get it done
-    curl -X POST -d "$QUERY" $DEFAULT_ENV/query/data --header "Content-Type:application/json"
+    #curl -X POST -v -d "$QUERY" -H "Content-Type:application/json" -H "$SESSION_TOKEN" $DEFAULT_ENV/query/data
+    curl -X POST -s -d "$QUERY" -H "Content-Type:application/json" $DEFAULT_ENV/query/data
 }

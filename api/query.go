@@ -13,48 +13,48 @@ import (
 // http.StatusUnauthorized
 func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
-	if a.authorized(req) {
+	//if a.authorized(req) {
 
-		log.Print("Query: starting ... ")
+	log.Print("Query: starting ... ")
 
-		defer req.Body.Close()
-		if rawQuery, err := ioutil.ReadAll(req.Body); err != nil || string(rawQuery) == "" {
-			log.Printf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body)
+	defer req.Body.Close()
+	if rawQuery, err := ioutil.ReadAll(req.Body); err != nil || string(rawQuery) == "" {
+		log.Printf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body)
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	} else {
+		query := string(rawQuery)
+
+		log.Printf("Query: to execute [%s] ", query)
+
+		if errs, qd := model.ExtractQuery(query); len(errs) != 0 {
+
+			log.Printf("Query: errors [%v] found parsing raw query [%s]", errs, query)
 			res.WriteHeader(http.StatusBadRequest)
 			return
+
 		} else {
-			query := string(rawQuery)
 
-			log.Printf("Query: to execute [%s] ", query)
-
-			if errs, qd := model.ExtractQuery(query); len(errs) != 0 {
-
-				log.Printf("Query: errors [%v] found parsing raw query [%s]", errs, query)
+			if pair := a.SeagullClient.GetPrivatePair(qd.MetaQuery["userid"], "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
 				res.WriteHeader(http.StatusBadRequest)
 				return
-
 			} else {
-
-				if pair := a.SeagullClient.GetPrivatePair(qd.MetaQuery["userid"], "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
-					res.WriteHeader(http.StatusInternalServerError)
-					return
-				} else {
-					qd.MetaQuery["userid"] = pair.ID
-				}
-
-				log.Printf("Query: data used [%v]", qd)
-
-				result := a.Store.ExecuteQuery(qd)
-
-				log.Printf("Query: results [%s]", string(result))
-
-				res.WriteHeader(http.StatusOK)
-				res.Write(result)
-				return
+				qd.MetaQuery["userid"] = pair.ID
 			}
+
+			log.Printf("Query: data used [%v]", qd)
+
+			result := a.Store.ExecuteQuery(qd)
+
+			log.Printf("Query: results [%s]", string(result))
+
+			res.WriteHeader(http.StatusOK)
+			res.Write(result)
+			return
 		}
 	}
-	log.Print("Query: failed authorization")
-	res.WriteHeader(http.StatusUnauthorized)
-	return
+	//}
+	//log.Print("Query: failed authorization")
+	//res.WriteHeader(http.StatusUnauthorized)
+	//return
 }

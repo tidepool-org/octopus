@@ -109,25 +109,22 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 			queryThat["type"] = bson.M{"$in": details.Types}
 		}
 		//add where
-		if len(details.WhereConditons) > 0 {
-
-			if len(details.WhereConditons) == 1 {
-				log.Println("constructQuery: where statement with just the one condition")
-				first := details.WhereConditons[0]
-				op := getMongoOperator(first.Condition)
-				queryThis[first.Name] = bson.M{op: first.Value}
-				queryThat[first.Name] = bson.M{op: first.Value}
-			} else if len(details.WhereConditons) == 2 {
-				log.Println("constructQuery: where statement with with two conditions")
-				first := details.WhereConditons[0]
-				op1 := getMongoOperator(first.Condition)
-				second := details.WhereConditons[1]
-				op2 := getMongoOperator(second.Condition)
-				queryThis[first.Name] = bson.M{op1: first.Value, op2: second.Value}
-				queryThat[first.Name] = bson.M{op1: first.Value, op2: second.Value}
-
-			}
+		if len(details.WhereConditons) == 1 {
+			log.Println("constructQuery: where statement with just the one condition")
+			first := details.WhereConditons[0]
+			op := getMongoOperator(first.Condition)
+			queryThis[first.Name] = bson.M{op: first.Value}
+			queryThat[first.Name] = bson.M{op: first.Value}
+		} else if len(details.WhereConditons) == 2 {
+			log.Println("constructQuery: where statement with with two conditions")
+			first := details.WhereConditons[0]
+			op1 := getMongoOperator(first.Condition)
+			second := details.WhereConditons[1]
+			op2 := getMongoOperator(second.Condition)
+			queryThis[first.Name] = bson.M{op1: first.Value, op2: second.Value}
+			queryThat[first.Name] = bson.M{op1: first.Value, op2: second.Value}
 		}
+
 		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
 		log.Printf("constructQuery: full query is %v", query)
 	}
