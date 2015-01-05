@@ -13,11 +13,11 @@ const (
 	ERROR_TYPES_REQUIRED     = "Missing required TYPE IN e.g. TYPE IN cbg, smbg"
 
 	KEYWORD_WHERE   = "where"
-	KEYWORD_AND     = "and"
+	KEYWORD_AND     = " and "
 	KEYWORD_IS      = "is"
-	KEYWORD_TYPE_IN = "type in"
-	KEYWORD_SORT    = "sort by"
-	KEYWORD_AS      = "as"
+	KEYWORD_TYPE_IN = " type in "
+	KEYWORD_SORT    = " sort by "
+	KEYWORD_AS      = " as "
 	KEYWORD_REVERSE = "reversed"
 )
 
