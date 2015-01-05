@@ -27,7 +27,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 		log.Printf("Query: to execute [%s] ", query)
 
-		if errs, qd := model.ExtractQuery(query); len(errs) != 0 {
+		if errs, qd := model.BuildQuery(query); len(errs) != 0 {
 
 			log.Printf("Query: errors [%v] found parsing raw query [%s]", errs, query)
 			res.WriteHeader(http.StatusBadRequest)

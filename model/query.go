@@ -3,22 +3,14 @@ package model
 import (
 	"errors"
 	"log"
+	"regexp"
 	"strings"
 )
 
 const (
 	ERROR_METAQUERY_REQUIRED = "Missing required METAQUERY e.g. METAQUERY WHERE userid IS 12d7bc90"
-	ERROR_SORT_REQUIRED      = "Missing required SORT BY e.g. SORT BY time"
-	ERROR_SORT_AS_REQUIRED   = "Missing required AS e.g. SORT BY time AS Timestamp"
+	ERROR_SORT_REQUIRED      = "Missing required SORT BY e.g. SORT BY time AS Timestamp"
 	ERROR_TYPES_REQUIRED     = "Missing required TYPE IN e.g. TYPE IN cbg, smbg"
-
-	KEYWORD_WHERE   = "where"
-	KEYWORD_AND     = "and"
-	KEYWORD_IS      = "is"
-	KEYWORD_TYPE_IN = " type in "
-	KEYWORD_SORT    = " sort by "
-	KEYWORD_AS      = " as "
-	KEYWORD_REVERSE = "reversed"
 )
 
 type (
@@ -36,147 +28,119 @@ type (
 	}
 )
 
-//iterate over items and look for the key word
-func keywordIndex(keyword string, list []string) int {
-	for i, b := range list {
-		if b == keyword {
-			return i
-		}
-	}
-	return 0
-}
-
-//e.g. METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE
 func (qd *QueryData) buildMetaQuery(raw string) error {
+	meta := regexp.MustCompile(`(?i)\bMETAQUERY WHERE (.*) IS (.*) \bQUERY`)
+	data := meta.FindStringSubmatch(raw)
 
-	metaQuery := strings.Split(strings.ToLower(raw), " query")[0]
-
-	metaQueryParts := strings.Fields(metaQuery)
-
-	if len(metaQueryParts) != 5 ||
-		strings.TrimSpace(metaQueryParts[1]) != KEYWORD_WHERE ||
-		strings.TrimSpace(metaQueryParts[3]) != KEYWORD_IS {
-
-		log.Printf("buildMetaQuery from %v gives error [%s]", metaQueryParts, ERROR_METAQUERY_REQUIRED)
-		return errors.New(ERROR_METAQUERY_REQUIRED)
+	if len(data) == 3 {
+		qd.MetaQuery = map[string]string{data[1]: data[2]}
+		return nil
 	}
 
-	qd.MetaQuery = map[string]string{strings.TrimSpace(metaQueryParts[2]): strings.TrimSpace(metaQueryParts[4])}
-
-	return nil
+	log.Printf("buildMetaQuery from %v gives error [%s]", data, ERROR_METAQUERY_REQUIRED)
+	return errors.New(ERROR_METAQUERY_REQUIRED)
 }
 
-//e.g. WHERE time > starttime AND time < endtime
-func (qd *QueryData) buildWhere(raw string) error {
-
-	if strings.Contains(strings.ToLower(raw), KEYWORD_TYPE_IN) {
-		//just get after the query ignoring the rest
-		query := strings.Split(strings.ToLower(raw), "query type in")[1]
-		//do we have a where statement?
-		if strings.Contains(strings.ToLower(query), KEYWORD_WHERE) {
-
-			queryParts := strings.Fields(query)
-			whereIndex := keywordIndex(KEYWORD_WHERE, queryParts)
-			log.Print("buildWhere adding initial where condition")
-
-			qd.WhereConditons = append(qd.WhereConditons,
-				WhereCondition{
-					Name:      queryParts[whereIndex+1],
-					Condition: queryParts[whereIndex+2],
-					Value:     strings.ToUpper(queryParts[whereIndex+3]),
-				})
-
-			//do we also have an and?
-			if andIndex := keywordIndex(KEYWORD_AND, queryParts); andIndex != 0 {
-				log.Print("buildWhere appending where condition")
-				qd.WhereConditons = append(qd.WhereConditons,
-					WhereCondition{
-						Name:      queryParts[andIndex+1],
-						Condition: queryParts[andIndex+2],
-						Value:     strings.ToUpper(queryParts[andIndex+3]),
-					})
-			}
-		}
-
-	}
-	return nil
-}
-
-//e.g. TYPE IN update, cbg, smbg
 func (qd *QueryData) buildTypes(raw string) error {
+	typesMatch := regexp.MustCompile(`(?i)\bQUERY TYPE IN (.*) \bWHERE`)
+	typesData := typesMatch.FindStringSubmatch(raw)
 
-	if strings.Index(strings.ToLower(raw), KEYWORD_TYPE_IN) != -1 {
-		typesIn := strings.Split(strings.ToLower(raw), KEYWORD_TYPE_IN)[1]
-
-		if typesIn != "" {
-			//now just get each individual type
-			endsAt := KEYWORD_WHERE
-			if strings.Index(typesIn, KEYWORD_WHERE) == -1 {
-				endsAt = KEYWORD_SORT
-			}
-
-			typesIn = strings.Split(typesIn, endsAt)[0]
-
-			typeParts := strings.Split(typesIn, ",")
-
-			for i := range typeParts {
-				qd.Types = append(qd.Types, strings.TrimSpace(typeParts[i]))
-			}
-			return nil
-		}
+	if len(typesData) != 2 {
+		typesMatch = regexp.MustCompile(`(?i)\bQUERY TYPE IN (.*) \bSORT`)
+		typesData = typesMatch.FindStringSubmatch(raw)
 	}
-	log.Printf("buildTypes [%s] gives error [%s]", raw, ERROR_TYPES_REQUIRED)
+
+	if len(typesData) == 2 {
+		types := strings.Split(typesData[1], ",")
+
+		for i := range types {
+			qd.Types = append(qd.Types, strings.TrimSpace(types[i]))
+		}
+		return nil
+	}
+
+	log.Printf("buildTypes from %v gives error [%s]", raw, ERROR_TYPES_REQUIRED)
 	return errors.New(ERROR_TYPES_REQUIRED)
 }
 
 func (qd *QueryData) buildSort(raw string) error {
-	if containsSort := strings.Index(strings.ToLower(raw), KEYWORD_SORT); containsSort != -1 {
+	sortMatch := regexp.MustCompile(`(?i)\bSORT BY (.*) AS (.*) REVERSED\b`)
+	sortData := sortMatch.FindStringSubmatch(raw)
 
-		if containsSortAs := strings.Index(strings.ToLower(raw), KEYWORD_AS); containsSortAs != -1 {
-
-			sortFieldName := strings.TrimSpace(raw[containsSort+len(KEYWORD_SORT) : containsSortAs])
-			if sortEnd := strings.Index(strings.ToLower(raw), KEYWORD_REVERSE); sortEnd != -1 {
-
-				sortAsValue := strings.TrimSpace(raw[containsSortAs+len(KEYWORD_AS) : sortEnd])
-
-				qd.Sort = map[string]string{sortFieldName: sortAsValue}
-
-				return nil
-			} else {
-				log.Printf("buildSort [%s] gives error [%s]", raw, "no end of the sort")
-				return errors.New("no end of the sort")
-			}
-
-		} else {
-			log.Printf("buildSort [%s] gives error [%s]", raw, ERROR_SORT_AS_REQUIRED)
-			return errors.New(ERROR_SORT_AS_REQUIRED)
-		}
-	} else {
-		log.Printf("buildSort [%s] gives error [%s]", raw, ERROR_SORT_REQUIRED)
-		return errors.New(ERROR_SORT_REQUIRED)
+	if len(sortData) != 3 {
+		sortMatch = regexp.MustCompile(`(?i)\bSORT BY (.*) AS (.*)`)
+		sortData = sortMatch.FindStringSubmatch(raw)
 	}
+
+	if len(sortData) == 3 {
+		qd.Sort = map[string]string{strings.TrimSpace(sortData[1]): strings.TrimSpace(sortData[2])}
+		return nil
+	}
+
+	log.Printf("buildSort from %v gives error [%s]", raw, ERROR_SORT_REQUIRED)
+	return errors.New(ERROR_SORT_REQUIRED)
+}
+
+func (qd *QueryData) buildWhere(raw string) {
+	where := regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*) \bSORT`)
+	whereData := where.FindStringSubmatch(raw)
+
+	if len(whereData) == 7 {
+
+		qd.WhereConditons = append(qd.WhereConditons,
+			WhereCondition{
+				Name:      whereData[1],
+				Condition: whereData[2],
+				Value:     whereData[3],
+			}, WhereCondition{
+				Name:      whereData[4],
+				Condition: whereData[5],
+				Value:     whereData[6],
+			})
+
+		return
+	} else {
+
+		where = regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) \bSORT`)
+		whereData = where.FindStringSubmatch(raw)
+
+		if len(whereData) == 4 {
+			qd.WhereConditons = append(qd.WhereConditons,
+				WhereCondition{
+					Name:      whereData[1],
+					Condition: whereData[2],
+					Value:     whereData[3],
+				})
+			return
+		}
+	}
+
+	log.Printf("buildWhere from [%s] shows no where clause", raw)
 }
 
 func (qd *QueryData) buildOrder(raw string) {
 
-	if strings.Index(strings.ToLower(raw), KEYWORD_REVERSE) != -1 {
+	qd.Reverse = false
+
+	if strings.Index(strings.ToLower(raw), "reverse") != -1 {
 		qd.Reverse = true
-	} else {
-		qd.Reverse = false
 	}
+
 	return
 }
 
-//e.g. "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update WHERE time > starttime AND time < endtime SORT BY time AS Timestamp REVERSED",
-func ExtractQuery(raw string) (parseErrs []error, qd *QueryData) {
+func BuildQuery(raw string) (parseErrs []error, qd *QueryData) {
 
 	qd = &QueryData{}
 
+	//METAQUERY WHERE userid IS 12d7bc90fa
+	//QUERY TYPE IN smbg, cbg
+	//WHERE time > starttime AND time < endtime
+	//SORT BY time AS Timestamp
+	//REVERSED
+
 	if metaErr := qd.buildMetaQuery(raw); metaErr != nil {
 		parseErrs = append(parseErrs, metaErr)
-	}
-	if whereErr := qd.buildWhere(raw); whereErr != nil {
-		parseErrs = append(parseErrs, whereErr)
 	}
 	if typeErr := qd.buildTypes(raw); typeErr != nil {
 		parseErrs = append(parseErrs, typeErr)
@@ -184,6 +148,7 @@ func ExtractQuery(raw string) (parseErrs []error, qd *QueryData) {
 	if sortErr := qd.buildSort(raw); sortErr != nil {
 		parseErrs = append(parseErrs, sortErr)
 	}
+	qd.buildWhere(raw)
 	qd.buildOrder(raw)
 
 	return parseErrs, qd

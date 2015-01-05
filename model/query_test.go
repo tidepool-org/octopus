@@ -86,17 +86,6 @@ func TestMetaQueryWhere(t *testing.T) {
 
 }
 
-func TestQueryWhere_GivesNoError_WhenNoWhereStatement(t *testing.T) {
-	qd := &QueryData{}
-
-	noWhereErr := qd.buildWhere("METAQUERY WHERE userid QUERY TYPE IN update")
-
-	if noWhereErr != nil {
-		t.Fatalf("got err [%s] but expected none", noWhereErr.Error())
-	}
-
-}
-
 func TestQueryWhere(t *testing.T) {
 
 	//WHERE time > starttime AND time < endtime
@@ -195,15 +184,15 @@ func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
 
 	noSortAsErr := qd.buildSort("QUERY TYPE IN update, cbg, smbg SORT BY time")
 
-	if noSortAsErr.Error() != ERROR_SORT_AS_REQUIRED {
-		t.Fatalf("got err [%s] expected err [%s]", noSortAsErr.Error(), ERROR_SORT_AS_REQUIRED)
+	if noSortAsErr.Error() != ERROR_SORT_REQUIRED {
+		t.Fatalf("got err [%s] expected err [%s]", noSortAsErr.Error(), ERROR_SORT_REQUIRED)
 	}
 
 }
 
 func TestExractQueryData(t *testing.T) {
 
-	errs, qd := ExtractQuery(VALID_QUERY)
+	errs, qd := BuildQuery(VALID_QUERY)
 
 	if len(errs) != 0 {
 		t.Fatalf("there should be no errors but got %v", errs)
@@ -217,7 +206,7 @@ func TestExractQueryData(t *testing.T) {
 
 func TestExractQueryData_AccumulatesErrors(t *testing.T) {
 
-	errs, _ := ExtractQuery("blah blah")
+	errs, _ := BuildQuery("blah blah")
 
 	if len(errs) != 3 {
 		t.Fatalf("there should be errors [%d]", len(errs))
