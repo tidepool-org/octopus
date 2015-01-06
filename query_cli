@@ -2,8 +2,7 @@
 #
 # It allows the user to login and then query data via the octopus query endpoint
 
-DEFAULT_ENV="http://localhost:8009"
-SESSION_TOKEN=""
+DEFAULT_ENV="https://devel-api.tidepool.io"
 
 # Login to the tidepool-platfrom and get a session-token
 tp_login() {
@@ -13,19 +12,23 @@ tp_login() {
         return
     fi
 
-    SESSION_TOKEN=$(curl -s -X POST -I -u $1 $DEFAULT_ENV/auth/login | grep x-tidepool-session-token)
+    curl -s -X POST --dump-header headers -u $1 $DEFAULT_ENV/auth/login
 
     # are you logged in?
-    if [ -z "$SESSION_TOKEN" ]; then
+    loggedIn="$(grep "200 OK" headers)"
+    if [ -z "$loggedIn" ]; then
+        echo ""
         echo "something went wrong trying to login. Did you do tp_login <username>?"
         return
     fi
+    echo ""
     echo "Your now logged in"
 }
 
 # Logout by clearing the token we are storing
 tp_logout() {
-    SESSION_TOKEN=""
+    rm -rf headers
+    echo ""
     echo "You have now logged out"
 }
 
@@ -33,7 +36,8 @@ tp_logout() {
 tp_query() {
 
     # are you logged in?
-    if [ -z "$SESSION_TOKEN" ]; then
+    loggedIn="$(grep x-tidepool-session-token: headers)"
+    if [ -z "$loggedIn" ]; then
         echo "please login first i.e. tp_login <username>"
         return
     fi
@@ -46,7 +50,6 @@ tp_query() {
 
     # do you want to specify different types to query for?
     QUERY_TYPES="cbg, smbg, bolus, wizard"
-
 
     if [ -n "$2" ]; then
         QUERY_TYPES=$2
@@ -63,17 +66,13 @@ tp_query() {
     QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
 
     echo "[$QUERY]"
+    echo ""
     read  -p "enter to run the query or [c] to cancel " input
 
     if [ "$input" = "c" ]; then
         echo ""
-        echo "canceled: didn't run [$QUERY]"
+        echo "canceled: [$QUERY]"
     else
-        # get it done
-
-        curl -X POST \
-        -H "$x-tidepool-session-token: " \
-        -d "$QUERY" \
-        $DEFAULT_ENV/query/data
+        curl -X POST -d "$QUERY" $DEFAULT_ENV/query/data
     fi
 }
