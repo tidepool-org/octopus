@@ -2,30 +2,33 @@
 #
 # It allows the user to login and then query data via the octopus query endpoint
 
-DEFAULT_ENV="http://localhost:8009"
-SESSION_TOKEN=""
+DEFAULT_ENV="https://devel-api.tidepool.io"
 
 # Login to the tidepool-platfrom and get a session-token
-tp_logon() {
+tp_login() {
 
     if [ -z "$1" ]; then
-        echo "your user name is required i.e. tp_logon <username>"
+        echo "your user name is required i.e. tp_login <username>"
         return
     fi
 
-    SESSION_TOKEN=$(curl -s -X POST -I -u $1 $DEFAULT_ENV/auth/login | grep x-tidepool-session-token)
+    curl -s -X POST --dump-header headers -u $1 $DEFAULT_ENV/auth/login
 
     # are you logged in?
-    if [ -z "$SESSION_TOKEN" ]; then
-        echo "something went wrong trying to login. Did you do tp_logon <username>?"
+    loggedIn="$(grep "200 OK" headers)"
+    if [ -z "$loggedIn" ]; then
+        echo ""
+        echo "something went wrong trying to login. Did you do tp_login <username>?"
         return
     fi
+    echo ""
     echo "Your now logged in"
 }
 
 # Logout by clearing the token we are storing
 tp_logout() {
-    SESSION_TOKEN=""
+    rm -rf headers
+    echo ""
     echo "You have now logged out"
 }
 
@@ -33,8 +36,9 @@ tp_logout() {
 tp_query() {
 
     # are you logged in?
-    if [ -z "$SESSION_TOKEN" ]; then
-        echo "please login first i.e. tp_logon <username>"
+    loggedIn="$(grep x-tidepool-session-token: headers)"
+    if [ -z "$loggedIn" ]; then
+        echo "please login first i.e. tp_login <username>"
         return
     fi
 
@@ -51,6 +55,9 @@ tp_query() {
         QUERY_TYPES=$2
     fi
 
+    # do you want to constrain the query by time?
+    QUERY_WHERE=""
+
     if [ -n "$3" ]; then
         # e.g. "WHERE time > 2014-11-24T05:00:00.000Z AND time < 2014-12-24T05:00:00.000Z"
         QUERY_WHERE=$3
@@ -59,16 +66,13 @@ tp_query() {
     QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
 
     echo "[$QUERY]"
-    read  -p "o[k] to run your query " input
+    echo ""
+    read  -p "enter to run the query or [c] to cancel " input
 
-    if [ "$input" = "o" ]; then
-        # get it done
-        # -H '$SESSION_TOKEN' \
-        curl -X POST \
-        -d "$QUERY" \
-        $DEFAULT_ENV/query/data
-    else
+    if [ "$input" = "c" ]; then
         echo ""
-        echo "didn't run [$QUERY]"
+        echo "canceled: [$QUERY]"
+    else
+        curl -X POST -d "$QUERY" $DEFAULT_ENV/query/data
     fi
 }
