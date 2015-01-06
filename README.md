@@ -86,3 +86,19 @@ Both starttime and endtime must be ISO 8601 timestamps referenced to UTC (exampl
 
 Whitespace and upper/lower case are ignored; the formatting above makes it easier to read but it’s unimportant.
 
+## Running Query's:
+
+-- use "source" (also known as ".") to load it, as in ```. query_cli```
+
+There is a packaged set of scripts, the [query_cli](http://developer.tidepool.io/octopus/query_cli), that allows a user to
+
+
+* login using an existing tidepool-account
+```
+tp_login <user_name>
+```
+* with that account query the data of accounts that you have
+```
+tp_query <userid_to_query> "smbg, cbg" "WHERE time > 2014-11-23T10:25:16"
+```
+
