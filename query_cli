@@ -6,10 +6,10 @@ DEFAULT_ENV="http://localhost:8009"
 SESSION_TOKEN=""
 
 # Login to the tidepool-platfrom and get a session-token
-tp_logon() {
+tp_login() {
 
     if [ -z "$1" ]; then
-        echo "your user name is required i.e. tp_logon <username>"
+        echo "your user name is required i.e. tp_login <username>"
         return
     fi
 
@@ -17,7 +17,7 @@ tp_logon() {
 
     # are you logged in?
     if [ -z "$SESSION_TOKEN" ]; then
-        echo "something went wrong trying to login. Did you do tp_logon <username>?"
+        echo "something went wrong trying to login. Did you do tp_login <username>?"
         return
     fi
     echo "Your now logged in"
@@ -34,7 +34,7 @@ tp_query() {
 
     # are you logged in?
     if [ -z "$SESSION_TOKEN" ]; then
-        echo "please login first i.e. tp_logon <username>"
+        echo "please login first i.e. tp_login <username>"
         return
     fi
 
@@ -47,9 +47,13 @@ tp_query() {
     # do you want to specify different types to query for?
     QUERY_TYPES="cbg, smbg, bolus, wizard"
 
+
     if [ -n "$2" ]; then
         QUERY_TYPES=$2
     fi
+
+    # do you want to constrain the query by time?
+    QUERY_WHERE=""
 
     if [ -n "$3" ]; then
         # e.g. "WHERE time > 2014-11-24T05:00:00.000Z AND time < 2014-12-24T05:00:00.000Z"
@@ -59,16 +63,17 @@ tp_query() {
     QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
 
     echo "[$QUERY]"
-    read  -p "o[k] to run your query " input
+    read  -p "enter to run the query or [c] to cancel " input
 
-    if [ "$input" = "o" ]; then
+    if [ "$input" = "c" ]; then
+        echo ""
+        echo "canceled: didn't run [$QUERY]"
+    else
         # get it done
-        # -H '$SESSION_TOKEN' \
+
         curl -X POST \
+        -H "$x-tidepool-session-token: " \
         -d "$QUERY" \
         $DEFAULT_ENV/query/data
-    else
-        echo ""
-        echo "didn't run [$QUERY]"
     fi
 }
