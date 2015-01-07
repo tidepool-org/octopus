@@ -7,16 +7,51 @@
 # However, you can change the TIDEPOOL_SERVER environment variable and
 # use a different server. See Tidepool for details
 
-# Use the first line for a local server, the second for Tidepool's dev server
+# Use the first line if you're running a local server.
+# Most people will use the second for Tidepool's dev server.
 # TIDEPOOL_SERVER="http://localhost:8009"
 TIDEPOOL_SERVER="https://devel-api.tidepool.io"
 #
-# Usage example:
 #
-# $source query.cli
-# $tp_login me@myserver.com
-# <enter password>
-# $tp_query
+# Usage example:
+#-------------------
+#
+# $ . query_cli
+#
+# $ tp_login c@c.com
+# Enter host password for user 'c@c.com':
+# {"userid":"467c4642d5","username":"c@c.com","emails":["c@c.com"]}
+# You're now logged in.
+#
+# $ tp_setuser 467c4642d5
+# User ID now set to '467c4642d5'.
+#
+# $ tp_settypes cbg
+# Query types now set to 'cbg'.
+#
+# $ tp_setstartdate 2014-08-20
+# Query start date now set to '2014-08-20T00:00:00.000Z'.
+#
+# $ tp_setenddate 2014-08-21
+# Query end date now set to '2014-08-21T00:00:00.000Z'.
+#
+# $ tp_query >output.txt
+# The query will be:
+# METAQUERY WHERE userid IS 467c4642d5 QUERY TYPE IN cbg WHERE time > 2014-08-20T00:00:00.000Z AND time < 2014-08-21T00:00:00.000Z SORT BY time AS Timestamp REVERSED
+
+# Enter to run the query or [c] to cancel:
+#   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+#                                  Dload  Upload   Total   Spent    Left  Speed
+# 100  100k    0  100k  100   163  20347     32  0:00:05  0:00:05 --:--:-- 22766
+#   [10:32 AM][~/tidepool/octopus][kjq/cleanerQuery]
+#-------------------
+
+
+# you can also do it all in one command (with more variation possible) like this:
+# tp_query 467c4642d5 cbg "WHERE time > 2014-08-20T00:00:00.000Z AND time < 2014-08-21T00:00:00.000Z"
+
+
+
 
 # Login to the tidepool-platfrom and get a session-token
 tp_login() {
@@ -28,13 +63,12 @@ tp_login() {
 
     # save the headers in a tempfile so we can extract the token
     TEMPFILE="tplogin-$$.tmp"
-    curl -s -X POST --dump-header $TEMPFILE -u $1 $DEFAULT_ENV/auth/login
+    curl -s -X POST --dump-header $TEMPFILE -u $1 $TIDEPOOL_SERVER/auth/login
     # now put the token in the environment
     export LOGIN_TOKEN=$(grep "x-tidepool-session-token:" $TEMPFILE)
     rm $TEMPFILE
 
     # are you logged in?
-    loggedIn="$(grep "200 OK" headers)"
     if [ -z "$LOGIN_TOKEN" ]; then
         echo ""
         echo "Something went wrong trying to login. Bad password? Wrong server?"
@@ -51,6 +85,45 @@ tp_logout() {
     echo "You have now logged out."
 }
 
+tp_setuser() {
+    if [ -z "$1" ]; then
+        echo "we need the id of the user whose data you are querying i.e. tp_user <userid>"
+        return
+    fi
+    export TP_USERID=$1
+    echo "User ID now set to '$TP_USERID'".
+}
+
+tp_settypes() {
+    if [ -z "$1" ]; then
+        export TP_QUERYTYPES=
+    else
+        export TP_QUERYTYPES=$1
+    fi
+    echo "Query types now set to '$TP_QUERYTYPES'".
+}
+
+tp_setstartdate() {
+    if [ -z "$1" ]; then
+        export TP_STARTDATE=
+        echo "Query start date not set."
+    else
+        export TP_STARTDATE="$1T00:00:00.000Z"
+        echo "Query start date now set to '$TP_STARTDATE'".
+    fi
+}
+
+tp_setenddate() {
+    if [ -z "$1" ]; then
+        export TP_ENDDATE=
+        echo "Query end date not set."
+    else
+        export TP_ENDDATE="$1T00:00:00.000Z"
+        echo "Query end date now set to '$TP_ENDDATE'".
+    fi
+}
+
+
 # Run the data query for a given user id
 tp_query() {
 
@@ -61,13 +134,21 @@ tp_query() {
     fi
 
     # do we have a user id for us to query?
-    if [ -z "$1" ]; then
-        echo "we need the id of the user whose data you are querying i.e. tp_query <userid>"
-        return
+    if [ -z "$TP_USERID" ]; then
+        if [ -z "$1" ]; then
+            echo "we need the id of the user whose data you are querying i.e. tp_query <userid>"
+            return
+        else
+            TP_USERID=$1
+        fi
     fi
 
     # do you want to specify different types to query for?
-    QUERY_TYPES="cbg, smbg, bolus, wizard"
+    if [ -n TP_QUERYTYPES ]; then
+        QUERY_TYPES=$TP_QUERYTYPES
+    else
+        QUERY_TYPES="cbg, smbg, bolus, wizard"
+    fi
 
     if [ -n "$2" ]; then
         QUERY_TYPES=$2
@@ -79,9 +160,17 @@ tp_query() {
     if [ -n "$3" ]; then
         # e.g. "WHERE time > 2014-11-24T05:00:00.000Z AND time < 2014-12-24T05:00:00.000Z"
         QUERY_WHERE=$3
+    else
+        if [ -n "$TP_STARTDATE" -a -n "$TP_ENDDATE" ]; then
+            QUERY_WHERE="WHERE time > $TP_STARTDATE AND time < $TP_ENDDATE"
+        elif [ -n "$TP_STARTDATE" ]; then
+            QUERY_WHERE="WHERE time > $TP_STARTDATE"
+        elif [ ]; then
+            QUERY_WHERE="WHERE time < $TP_ENDDATE"
+        fi
     fi
 
-    QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
+    QUERY="METAQUERY WHERE userid IS $TP_USERID QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
 
     # send these prompts to stdout so that you can redirect the output of this
     # command to a file to save the result
