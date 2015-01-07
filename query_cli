@@ -1,43 +1,61 @@
 # This file should be run with 'source' (also known as '.' on linux/macs).
 #
-# It allows the user to login and then query data via the octopus query endpoint
+# It creates several functions that allow the user to login and then query data
+# via the octopus query endpoint.
+#
+# Note that this is currently set up to query the Tidepool development server.
+# However, you can change the TIDEPOOL_SERVER environment variable and
+# use a different server. See Tidepool for details
 
-DEFAULT_ENV="https://devel-api.tidepool.io"
+# Use the first line for a local server, the second for Tidepool's dev server
+# TIDEPOOL_SERVER="http://localhost:8009"
+TIDEPOOL_SERVER="https://devel-api.tidepool.io"
+#
+# Usage example:
+#
+# $source query.cli
+# $tp_login me@myserver.com
+# <enter password>
+# $tp_query
 
 # Login to the tidepool-platfrom and get a session-token
 tp_login() {
 
     if [ -z "$1" ]; then
-        echo "your user name is required i.e. tp_login <username>"
+        echo "your user name is required (i.e. tp_login <username>)"
         return
     fi
 
-    curl -s -X POST --dump-header headers -u $1 $DEFAULT_ENV/auth/login
+    # save the headers in a tempfile so we can extract the token
+    TEMPFILE="tplogin-$$.tmp"
+    curl -s -X POST --dump-header $TEMPFILE -u $1 $DEFAULT_ENV/auth/login
+    # now put the token in the environment
+    export LOGIN_TOKEN=$(grep "x-tidepool-session-token:" $TEMPFILE)
+    rm $TEMPFILE
 
     # are you logged in?
     loggedIn="$(grep "200 OK" headers)"
-    if [ -z "$loggedIn" ]; then
+    if [ -z "$LOGIN_TOKEN" ]; then
         echo ""
-        echo "something went wrong trying to login. Did you do tp_login <username>?"
+        echo "Something went wrong trying to login. Bad password? Wrong server?"
         return
     fi
     echo ""
-    echo "Your now logged in"
+    echo "You're now logged in."
 }
 
 # Logout by clearing the token we are storing
 tp_logout() {
-    rm -rf headers
+    export LOGIN_TOKEN=
     echo ""
-    echo "You have now logged out"
+    echo "You have now logged out."
 }
 
 # Run the data query for a given user id
 tp_query() {
 
     # are you logged in?
-    loggedIn="$(grep x-tidepool-session-token: headers)"
-    if [ -z "$loggedIn" ]; then
+    if [ -z "$LOGIN_TOKEN" ]; then
         echo "please login first i.e. tp_login <username>"
         return
     fi
@@ -65,14 +83,17 @@ tp_query() {
 
     QUERY="METAQUERY WHERE userid IS $1 QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
 
-    echo "[$QUERY]"
-    echo ""
-    read  -p "enter to run the query or [c] to cancel " input
+    # send these prompts to stdout so that you can redirect the output of this
+    # command to a file to save the result
+    >&2 echo "The query will be:"
+    >&2 echo $QUERY
+    >&2 echo ""
+    read  -p "Enter to run the query or [c] to cancel:" input
 
     if [ "$input" = "c" ]; then
         echo ""
-        echo "canceled: [$QUERY]"
+        echo "Query cancelled."
     else
-        curl -X POST -d "$QUERY" $DEFAULT_ENV/query/data
+        curl -X POST -H '"$LOGIN_TOKEN"' -d "$QUERY" $TIDEPOOL_SERVER/query/data
     fi
 }
