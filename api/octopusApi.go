@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -45,6 +46,18 @@ type (
 
 	varsHandler func(http.ResponseWriter, *http.Request, httpVars)
 )
+
+func (a *Api) sendModelAsResWithStatus(res http.ResponseWriter, model interface{}, statusCode int) {
+	if jsonDetails, err := json.Marshal(model); err != nil {
+		log.Printf("Error trying to send [%v]", model)
+		http.Error(res, "Error marshaling data for response", http.StatusInternalServerError)
+	} else {
+		res.Header().Set("content-type", "application/json")
+		res.WriteHeader(statusCode)
+		res.Write(jsonDetails)
+	}
+	return
+}
 
 func (a *Api) userCanViewData(userID, groupID string) bool {
 	if userID == groupID {
