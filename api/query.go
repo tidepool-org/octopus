@@ -13,7 +13,7 @@ import (
 
 const (
 	ERROR_READING_QUERY     = "There was an issue trying to build the query to run"
-	ERROR_GETTING_UPLOAD_ID = "There was an issue trying to retrieve the data id for the query"
+	ERROR_GETTING_UPLOAD_ID = "userid not found"
 )
 
 // http.StatusOK
