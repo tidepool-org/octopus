@@ -146,7 +146,13 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 
 	log.Printf("ExecuteQuery query[%v] sort[%s]", query, sort)
 
-	d.deviceDataC.Find(query).Sort(sort).All(&results)
+	// Request a socket connection from the session to process our query.
+	// Close the session when the goroutine exits and put the connection back
+	// into the pool.
+	sessionCopy := d.session.Copy()
+	defer sessionCopy.Close()
+
+	sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).Find(query).Sort(sort).All(&results)
 
 	if len(results) == 0 {
 		return []byte("[]")
