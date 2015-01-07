@@ -36,8 +36,9 @@ tp_logout() {
 tp_query() {
 
     # are you logged in?
-    loggedIn="$(grep x-tidepool-session-token: headers)"
-    if [ -z "$loggedIn" ]; then
+    session_token=""
+    session_token="$(grep x-tidepool-session-token: headers)"
+    if [ -z "$session_token" ]; then
         echo "please login first i.e. tp_login <username>"
         return
     fi

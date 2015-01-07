@@ -147,9 +147,15 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	log.Printf("ExecuteQuery query[%v] sort[%s]", query, sort)
 
 	d.deviceDataC.Find(query).Sort(sort).All(&results)
-	bytes, err := json.Marshal(results)
-	if err != nil {
-		log.Print("Failed to marshall event", results, err)
+
+	if len(results) == 0 {
+		return []byte("[]")
+	} else {
+		bytes, err := json.Marshal(results)
+
+		if err != nil {
+			log.Print("Failed to marshall event", results, err)
+		}
+		return bytes
 	}
-	return bytes
 }
