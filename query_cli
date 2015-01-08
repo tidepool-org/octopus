@@ -65,7 +65,7 @@ tp_login() {
     TEMPFILE="tplogin-$$.tmp"
     curl -s -X POST --dump-header $TEMPFILE -u $1 $TIDEPOOL_SERVER/auth/login
     # now put the token in the environment
-    export LOGIN_TOKEN=$(grep "x-tidepool-session-token:" $TEMPFILE)
+    export LOGIN_TOKEN=$(grep "x-tidepool-session-token:" $TEMPFILE |tr -d '\n\r')
     rm $TEMPFILE
 
     # are you logged in?
@@ -183,6 +183,6 @@ tp_query() {
         echo ""
         echo "Query cancelled."
     else
-        curl -X POST -H '"$LOGIN_TOKEN"' -d "$QUERY" $TIDEPOOL_SERVER/query/data
+        curl -X POST -H "$LOGIN_TOKEN" -d "$QUERY" $TIDEPOOL_SERVER/query/data
     fi
 }
