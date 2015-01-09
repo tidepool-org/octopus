@@ -128,23 +128,22 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
 		log.Printf("constructQuery: full query is %v", query)
 	}
-
-	//sort
+	//sort field and order
 	for k := range details.Sort {
 		sort = k
 		if details.Reverse {
 			sort = "-" + sort
 		}
 	}
+
 	return query, sort
 }
 
 func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
-	var results []interface{}
 
 	query, sort := constructQuery(details)
 
-	log.Printf("ExecuteQuery query[%v] sort[%s]", query, sort)
+	log.Printf("ExecuteQuery query[%v] sort[%v]", query, sort)
 
 	// Request a socket connection from the session to process our query.
 	// Close the session when the goroutine exits and put the connection back
@@ -152,16 +151,25 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	sessionCopy := d.session.Copy()
 	defer sessionCopy.Close()
 
-	sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).Find(query).Sort(sort).All(&results)
+	var results []interface{}
+
+	iter := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+		Find(query).
+		Sort(sort).
+		Iter()
+
+	var result map[string]interface{}
+
+	for iter.Next(&result) {
+		//do the cleanup
+		delete(result, "_id")
+		results = append(results, result)
+	}
 
 	if len(results) == 0 {
 		return []byte("[]")
 	} else {
-		bytes, err := json.Marshal(results)
-
-		if err != nil {
-			log.Print("Failed to marshall event", results, err)
-		}
+		bytes, _ := json.Marshal(results)
 		return bytes
 	}
 }
