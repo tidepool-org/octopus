@@ -128,7 +128,7 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
 		log.Printf("constructQuery: full query is %v", query)
 	}
-	//sort feild and order
+	//sort field and order
 	for k := range details.Sort {
 		sort = k
 		if details.Reverse {
@@ -151,27 +151,25 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	sessionCopy := d.session.Copy()
 	defer sessionCopy.Close()
 
+	var results []interface{}
+
 	iter := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
 		Sort(sort).
 		Iter()
 
-	var results []byte
 	var result map[string]interface{}
 
 	for iter.Next(&result) {
 		//do the cleanup
 		delete(result, "_id")
-		//add each to the results
-		if bytes, err := json.Marshal(result); err != nil {
-			log.Print("Failed to marshall event: ", result, err)
-		} else {
-			results = append(results, bytes...)
-		}
+		results = append(results, result)
 	}
 
 	if len(results) == 0 {
 		return []byte("[]")
+	} else {
+		bytes, _ := json.Marshal(results)
+		return bytes
 	}
-	return results
 }
