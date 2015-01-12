@@ -152,19 +152,14 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	defer sessionCopy.Close()
 
 	var results []interface{}
+	//we don't want to return the _id
+	filter := bson.M{"_id": 0}
 
-	iter := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+	sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
 		Sort(sort).
-		Iter()
-
-	var result map[string]interface{}
-
-	for iter.Next(&result) {
-		//do the cleanup
-		delete(result, "_id")
-		results = append(results, result)
-	}
+		Select(filter).
+		All(&results)
 
 	if len(results) == 0 {
 		return []byte("[]")

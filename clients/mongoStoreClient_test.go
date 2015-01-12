@@ -77,11 +77,9 @@ func TestMongoStore(t *testing.T) {
 		if results := mc.ExecuteQuery(basalsQd); results == nil {
 			t.Fatalf("no results were found for the query [%v]", basalsQd)
 		} else {
-			//all we care about for this test
-			type found struct {
-				Time string
-				Type string
-			}
+
+			type found map[string]interface{}
+
 			const ISO_8601 = "2006-01-02T15:04:05Z"
 			timeClause, _ := time.Parse(ISO_8601, theTime)
 
@@ -93,16 +91,50 @@ func TestMongoStore(t *testing.T) {
 				t.Fatalf("we should have been given two results but got [%d]", len(records))
 			}
 
-			for rec := range records {
-				//check the type
-				if records[rec].Type != "basal" {
-					t.Fatalf("they should be of type basal but where [%s] [%s]", records[rec].Type)
-				}
-				//check time in range
-				timeIs, _ := time.Parse(ISO_8601, records[rec].Time)
-				if timeIs.After(timeClause) {
-					t.Fatalf("time [%v] should be before than [%v] ", timeIs, timeClause)
-				}
+			// test first results
+			first := records[0]
+
+			if first["_id"] != nil {
+				t.Fatalf("the _id should not be set but is [%s] ", first["_id"])
+			}
+
+			if first["type"] != "basal" {
+				t.Fatalf("first should be of type basal but where [%s] ", first["type"])
+			}
+
+			firstTimeIs, _ := time.Parse(ISO_8601, first["time"].(string))
+			if firstTimeIs.After(timeClause) {
+				t.Fatalf("first time [%v] should be before than [%v] ", firstTimeIs, timeClause)
+			}
+			if first["time"] != "2014-10-23T07:00:00.000Z" {
+				t.Fatalf("first time [%s] should be 2014-10-23T07:00:00.000Z", first["time"])
+			}
+
+			if first["rate"] != 0.6 {
+				t.Fatalf("first rate [%d] should be 0.6", first["rate"])
+			}
+
+			// test sec results
+			second := records[1]
+
+			if second["_id"] != nil {
+				t.Fatalf("the _id should not be set but is [%s] ", second["_id"])
+			}
+
+			if second["type"] != "basal" {
+				t.Fatalf("second should be of type basal but where [%s] ", second["type"])
+			}
+
+			secondTimeIs, _ := time.Parse(ISO_8601, second["time"].(string))
+			if secondTimeIs.After(timeClause) {
+				t.Fatalf(" second time [%v] should be before than [%v] ", secondTimeIs, timeClause)
+			}
+			if second["time"] != "2014-10-23T08:00:00.000Z" {
+				t.Fatalf("second time [%s] should be 2014-10-23T08:00:00.000Z", second["time"])
+			}
+
+			if second["rate"] != 0.4 {
+				t.Fatalf("second rate [%d] should be 0.4", second["rate"])
 			}
 		}
 
