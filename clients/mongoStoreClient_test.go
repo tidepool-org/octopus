@@ -105,12 +105,12 @@ func TestMongoStore(t *testing.T) {
 			if firstTimeIs.After(timeClause) {
 				t.Fatalf("first time [%v] should be before than [%v] ", firstTimeIs, timeClause)
 			}
-			if first.Time != "2014-10-23T08:00:00.000Z" {
-				t.Fatalf("first time [%s] should be 2014-10-23T08:00:00.000Z", first.Time)
+			if first.Time != "2014-10-23T07:00:00.000Z" {
+				t.Fatalf("first time [%s] should be 2014-10-23T07:00:00.000Z", first.Time)
 			}
 
-			if first.Rate != 0.4 {
-				t.Fatalf("first rate [%d] should be 0.4", first.Rate)
+			if first.Rate != 0.6 {
+				t.Fatalf("first rate [%d] should be 0.6", first.Rate)
 			}
 
 			// test sec results
@@ -124,12 +124,12 @@ func TestMongoStore(t *testing.T) {
 			if secondTimeIs.After(timeClause) {
 				t.Fatalf(" second time [%v] should be before than [%v] ", secondTimeIs, timeClause)
 			}
-			if second.Time != "2014-10-23T07:00:00.000Z" {
-				t.Fatalf("second time [%s] should be 2014-10-23T07:00:00.000Z", second.Time)
+			if second.Time != "2014-10-23T08:00:00.000Z" {
+				t.Fatalf("second time [%s] should be 2014-10-23T08:00:00.000Z", second.Time)
 			}
 
-			if second.Rate != 0.6 {
-				t.Fatalf("second rate [%d] should be 0.6", second.Rate)
+			if second.Rate != 0.4 {
+				t.Fatalf("second rate [%d] should be 0.4", second.Rate)
 			}
 		}
 
