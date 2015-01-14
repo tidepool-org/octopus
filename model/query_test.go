@@ -190,7 +190,7 @@ func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
 
 }
 
-func TestExractQueryData(t *testing.T) {
+func TestExtractQueryData(t *testing.T) {
 
 	errs, qd := BuildQuery(VALID_QUERY)
 
@@ -204,7 +204,7 @@ func TestExractQueryData(t *testing.T) {
 
 }
 
-func TestExractQueryData_AccumulatesErrors(t *testing.T) {
+func TestExtractQueryData_AccumulatesErrors(t *testing.T) {
 
 	errs, _ := BuildQuery("blah blah")
 
