@@ -82,7 +82,7 @@ func (qd *QueryData) buildSort(raw string) error {
 }
 
 func (qd *QueryData) buildWhere(raw string) {
-	where := regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*) \bSORT`)
+	where := regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*) \bSORT`)
 	whereData := where.FindStringSubmatch(raw)
 
 	if len(whereData) == 7 {
@@ -101,7 +101,7 @@ func (qd *QueryData) buildWhere(raw string) {
 		return
 	} else {
 
-		where = regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) \bSORT`)
+		where = regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) \bSORT`)
 		whereData = where.FindStringSubmatch(raw)
 
 		if len(whereData) == 4 {
