@@ -8,6 +8,6 @@ TESTDIRS=$(find . -name "*_test.go" -and ! -path "./src/*" |sed s@/[^/]*go@@ |se
 for i in $TESTDIRS; do
     echo Testing in $i:
     cd $i
-    go test
+    go test -v
     cd ..
 done
