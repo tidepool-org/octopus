@@ -96,7 +96,7 @@ func (qd *QueryData) isInWhere(raw string) bool {
 }
 
 func (qd *QueryData) buildTimeWhere(raw string) {
-	where := regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*) \bSORT`)
+	where := regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*) \bSORT`)
 	whereData := where.FindStringSubmatch(raw)
 
 	if len(whereData) == 7 {
@@ -114,8 +114,7 @@ func (qd *QueryData) buildTimeWhere(raw string) {
 
 		return
 	} else {
-
-		where = regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) \bSORT`)
+		where = regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) \bSORT`)
 		whereData = where.FindStringSubmatch(raw)
 
 		if len(whereData) == 4 {
@@ -167,12 +166,6 @@ func (qd *QueryData) buildOrder(raw string) {
 func BuildQuery(raw string) (parseErrs []error, qd *QueryData) {
 
 	qd = &QueryData{}
-
-	//METAQUERY WHERE userid IS 12d7bc90fa
-	//QUERY TYPE IN smbg, cbg
-	//WHERE time > starttime AND time < endtime
-	//SORT BY time AS Timestamp
-	//REVERSED
 
 	if metaErr := qd.buildMetaQuery(raw); metaErr != nil {
 		parseErrs = append(parseErrs, metaErr)
