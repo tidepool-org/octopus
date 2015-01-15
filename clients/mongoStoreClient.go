@@ -175,6 +175,8 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 		Select(filter).
 		All(&results)
 
+	log.Printf("ExecuteQuery found [%d] results", len(results))
+
 	if len(results) == 0 {
 		return []byte("[]")
 	} else {
