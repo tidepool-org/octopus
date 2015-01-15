@@ -3,6 +3,7 @@ package clients
 import (
 	"encoding/json"
 	"log"
+	"strings"
 
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"labix.org/v2/mgo"
@@ -108,21 +109,34 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 			queryThis["type"] = bson.M{"$in": details.Types}
 			queryThat["type"] = bson.M{"$in": details.Types}
 		}
-		//add where
-		if len(details.WhereConditons) == 1 {
-			log.Println("constructQuery: where statement with just the one condition")
-			first := details.WhereConditons[0]
-			op := getMongoOperator(first.Condition)
-			queryThis[first.Name] = bson.M{op: first.Value}
-			queryThat[first.Name] = bson.M{op: first.Value}
-		} else if len(details.WhereConditons) == 2 {
-			log.Println("constructQuery: where statement with with two conditions")
-			first := details.WhereConditons[0]
-			op1 := getMongoOperator(first.Condition)
-			second := details.WhereConditons[1]
-			op2 := getMongoOperator(second.Condition)
-			queryThis[first.Name] = bson.M{op1: first.Value, op2: second.Value}
-			queryThat[first.Name] = bson.M{op1: first.Value, op2: second.Value}
+		if len(details.InList) > 0 {
+			log.Println("constructQuery: adding inlist")
+			first := details.WhereConditions[0]
+			switch strings.ToLower(first.Condition) {
+			case "in":
+				queryThis[first.Name] = bson.M{"$in": details.InList}
+			case "not in":
+				queryThis[first.Name] = bson.M{"$nin": details.InList}
+			}
+			queryThat[first.Name] = queryThis[first.Name]
+		} else {
+
+			//add where but only if there wasn't an InList
+			if len(details.WhereConditions) == 1 {
+				log.Println("constructQuery: where statement with just one condition")
+				first := details.WhereConditions[0]
+				op := getMongoOperator(first.Condition)
+				queryThis[first.Name] = bson.M{op: first.Value}
+				queryThat[first.Name] = bson.M{op: first.Value}
+			} else if len(details.WhereConditions) == 2 {
+				log.Println("constructQuery: where statement with two conditions")
+				first := details.WhereConditions[0]
+				op1 := getMongoOperator(first.Condition)
+				second := details.WhereConditions[1]
+				op2 := getMongoOperator(second.Condition)
+				queryThis[first.Name] = bson.M{op1: first.Value, op2: second.Value}
+				queryThat[first.Name] = bson.M{op1: first.Value, op2: second.Value}
+			}
 		}
 
 		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
@@ -160,6 +174,8 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 		Sort(sort).
 		Select(filter).
 		All(&results)
+
+	log.Printf("ExecuteQuery found [%d] results", len(results))
 
 	if len(results) == 0 {
 		return []byte("[]")

@@ -5,7 +5,9 @@ import (
 )
 
 const (
-	VALID_QUERY     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	QUERY_WHERE_AND = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	QUERY_WHERE     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	QUERY_WHERE_IN  = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg WHERE updateId NOT IN abcd, efgh, ijkl SORT BY time AS Timestamp REVERSED"
 	IS_REVERSE      = "blah blah reversed"
 	IS_REVERSE_CASE = "blah blah REVERSED"
 	NOT_REVERSE     = "blah blah"
@@ -74,7 +76,7 @@ func TestMetaQueryWhere(t *testing.T) {
 
 	qd := &QueryData{}
 
-	qd.buildMetaQuery(VALID_QUERY)
+	qd.buildMetaQuery(QUERY_WHERE)
 
 	if qd.MetaQuery[userid] == "" {
 		t.Fatalf("should be a userid set on [%v]", qd.MetaQuery)
@@ -86,20 +88,20 @@ func TestMetaQueryWhere(t *testing.T) {
 
 }
 
-func TestQueryWhere(t *testing.T) {
+func TestQueryWhereAnd(t *testing.T) {
 
 	//WHERE time > starttime AND time < endtime
 
 	qd := &QueryData{}
 
-	qd.buildWhere(VALID_QUERY)
+	qd.buildTimeWhere(QUERY_WHERE_AND)
 
-	if len(qd.WhereConditons) != 2 {
-		t.Fatalf("there should be two where conditions got %v", qd.WhereConditons)
+	if len(qd.WhereConditions) != 2 {
+		t.Fatalf("there should be two where conditions got %v", qd.WhereConditions)
 	}
 
-	first := qd.WhereConditons[0]
-	second := qd.WhereConditons[1]
+	first := qd.WhereConditions[0]
+	second := qd.WhereConditions[1]
 
 	if first.Name != "time" || first.Condition != ">" || first.Value != "2015-01-01T00:00:00.000Z" {
 		t.Fatalf("first where  %v doesn't match ", first)
@@ -110,28 +112,46 @@ func TestQueryWhere(t *testing.T) {
 	}
 }
 
-func TestQueryWhere_Gte(t *testing.T) {
-
-	const GTE_QUERY = "QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z AND time <= 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
+func TestQueryWhere_WithGte(t *testing.T) {
 
 	qd := &QueryData{}
 
-	qd.buildWhere(GTE_QUERY)
+	qd.buildTimeWhere(QUERY_WHERE)
 
-	if len(qd.WhereConditons) != 2 {
-		t.Fatalf("there should be two where conditions got %v", qd.WhereConditons)
+	if len(qd.WhereConditions) != 1 {
+		t.Fatalf("there should be two where conditions got %v", qd.WhereConditions)
 	}
 
-	first := qd.WhereConditons[0]
-	second := qd.WhereConditons[1]
+	first := qd.WhereConditions[0]
 
 	if first.Name != "time" || first.Condition != ">=" || first.Value != "2015-01-01T00:00:00.000Z" {
 		t.Fatalf("first where  %v doesn't match ", first)
 	}
 
-	if second.Name != "time" || second.Condition != "<=" || second.Value != "2015-01-01T01:00:00.000Z" {
-		t.Fatalf("second where  %v doesn't match ", second)
+}
+
+func TestQueryWhereIn(t *testing.T) {
+
+	qd := &QueryData{}
+
+	qd.buildInWhere(QUERY_WHERE_IN)
+
+	if len(qd.WhereConditions) != 1 {
+		t.Fatalf("there should be two where conditions got %v", qd.WhereConditions)
 	}
+
+	first := qd.WhereConditions[0]
+
+	if first.Name != "updateId" {
+		t.Fatalf("name [%s] doesn't match [updateId]", first.Name)
+	}
+	if first.Condition != "NOT IN" {
+		t.Fatalf("condition [%s] doesn't match [NOT IN]", first.Condition)
+	}
+	if first.Value != "NOT USED" {
+		t.Fatalf("value [%s] doesn't match [NOT USED] ", first.Value)
+	}
+
 }
 
 func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
@@ -148,7 +168,7 @@ func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
 func TestTypes(t *testing.T) {
 	qd := &QueryData{}
 
-	qd.buildTypes(VALID_QUERY)
+	qd.buildTypes(QUERY_WHERE_AND)
 
 	if len(qd.Types) != 3 {
 		t.Fatalf("should listed the three types from query got [%v]", qd.Types)
@@ -190,16 +210,138 @@ func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
 
 }
 
-func TestExtractQueryData(t *testing.T) {
+func TestBuildQuery_WithWhereAnd(t *testing.T) {
 
-	errs, qd := BuildQuery(VALID_QUERY)
+	//lets test it all
+
+	errs, qd := BuildQuery(QUERY_WHERE_AND)
 
 	if len(errs) != 0 {
 		t.Fatalf("there should be no errors but got %v", errs)
 	}
 
+	if qd.MetaQuery["userid"] != "12d7bc90fa" {
+		t.Fatalf("userid should be 12d7bc90fa but %v", qd.MetaQuery)
+	}
+
+	if len(qd.Types) != 3 {
+		t.Fatalf("should listed the three types from query got [%v]", qd.Types)
+	}
+
+	if qd.Types[0] != "update" {
+		t.Fatalf("type should have been update but [%s]", qd.Types[0])
+	}
+
+	if qd.Types[1] != "cbg" {
+		t.Fatalf("type should have been cbg but [%s]", qd.Types[1])
+	}
+
+	if qd.Types[2] != "smbg" {
+		t.Fatalf("type should have been smbg but [%s]", qd.Types[2])
+	}
+
 	if qd.Reverse != true {
 		t.Fatalf("should be reversed")
+	}
+
+	if len(qd.WhereConditions) != 2 {
+		t.Fatalf("there should be 2 conditions but got [%d]", len(qd.WhereConditions))
+	}
+
+	if qd.WhereConditions[0].Name != "time" || qd.WhereConditions[0].Condition != ">" || qd.WhereConditions[0].Value != "2015-01-01T00:00:00.000Z" {
+		t.Fatalf("first where  %v doesn't match ", qd.WhereConditions[0])
+	}
+
+	if qd.WhereConditions[1].Name != "time" || qd.WhereConditions[1].Condition != "<" || qd.WhereConditions[1].Value != "2015-01-01T01:00:00.000Z" {
+		t.Fatalf("second where  %v doesn't match ", qd.WhereConditions[1])
+	}
+
+}
+
+func TestBuildQuery_WithWhere(t *testing.T) {
+
+	//lets test it all
+
+	errs, qd := BuildQuery(QUERY_WHERE)
+
+	if len(errs) != 0 {
+		t.Fatalf("there should be no errors but got %v", errs)
+	}
+
+	if qd.MetaQuery["userid"] != "12d7bc90fa" {
+		t.Fatalf("userid should be 12d7bc90fa but %v", qd.MetaQuery)
+	}
+
+	if len(qd.Types) != 3 {
+		t.Fatalf("should listed the three types from query got [%v]", qd.Types)
+	}
+
+	if qd.Types[0] != "update" {
+		t.Fatalf("type should have been update but [%s]", qd.Types[0])
+	}
+
+	if qd.Types[1] != "cbg" {
+		t.Fatalf("type should have been cbg but [%s]", qd.Types[1])
+	}
+
+	if qd.Types[2] != "smbg" {
+		t.Fatalf("type should have been smbg but [%s]", qd.Types[2])
+	}
+
+	if qd.Reverse != true {
+		t.Fatalf("should be reversed")
+	}
+
+	if len(qd.WhereConditions) != 1 {
+		t.Fatalf("there should be 1 conditions but got [%d]", len(qd.WhereConditions))
+	}
+
+	first := qd.WhereConditions[0]
+
+	if first.Name != "time" || first.Condition != ">=" || first.Value != "2015-01-01T00:00:00.000Z" {
+		t.Fatalf("first where  %v doesn't match ", first)
+	}
+
+}
+
+func TestBuildQuery_WithWhereIn(t *testing.T) {
+
+	errs, qd := BuildQuery(QUERY_WHERE_IN)
+
+	if len(errs) != 0 {
+		t.Fatalf("there should be no errors but got %v", errs)
+	}
+
+	if qd.MetaQuery["userid"] != "12d7bc90fa" {
+		t.Fatalf("userid should be 12d7bc90fa but %v", qd.MetaQuery)
+	}
+
+	if len(qd.Types) != 1 {
+		t.Fatalf("should listed the one types from query got [%v]", qd.Types)
+	}
+
+	if qd.Types[0] != "cbg" {
+		t.Fatalf("type should have been cbg but [%s]", qd.Types[0])
+	}
+
+	if qd.Reverse != true {
+		t.Fatalf("should be reversed")
+	}
+
+	if len(qd.WhereConditions) != 1 {
+		t.Fatalf("there should be 1 conditions but got [%d]", len(qd.WhereConditions))
+	}
+
+	first := qd.WhereConditions[0]
+
+	if first.Name != "updateId" {
+		t.Fatalf("name [%s] doesn't match [updateId]", first.Name)
+	}
+	if first.Condition != "NOT IN" {
+		t.Fatalf("condition [%s] doesn't match [NOT IN]", first.Condition)
+	}
+	if first.Value != "NOT USED" {
+		t.Fatalf("value [%s] doesn't match [NOT USED] ", first.Value)
 	}
 
 }
