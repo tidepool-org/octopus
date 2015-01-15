@@ -15,7 +15,7 @@ The version that was originally created was specified to do a simple query again
 
 Authenticated calls must use a standard Tidepool authentication token in the headers. See the login function within [platform-client](https://github.com/tidepool-org/platform-client/blob/master/index.js) for details on how to log in and get one.
 
-Here is what we expect to implement for the next version:
+As of Jan 15, 2015 here is what we have implemented for the current version:
 
 ## Status
 
@@ -37,7 +37,7 @@ Requires authentication. Returns 200 and an ISO8601 timestamp of the last data r
 
 ## Query submission
 
-    POST /query
+    POST /query/data
 
 Requires authentication. The body of the post is the query text.
 
@@ -67,6 +67,20 @@ Query to get a block of records in a given time range:
         WHERE time > starttime AND time < endtime
         SORT BY time AS Timestamp REVERSED
 
+Query to get a block of records within a set of one or more upload IDs:
+    METAQUERY
+        WHERE userid IS 12d7bc90fa
+
+    QUERY
+        TYPE IN cbg
+        WHERE uploadId IN 4oiyhsdkh, 23498jsjsaf, ljlsadjfljasdf
+        SORT BY time AS Timestamp REVERSED
+
+You can also say NOT IN to reverse the sense of the test.
+
+You CANNOT currently combine the two types of WHERE clauses.
+
+
 Result will be a JSON array with individual records corresponding to the selected types, reverse sorted by date (from newest to oldest).
 
 The only acceptable `METAQUERY` is to query for a single userid. Aggregate metaqueries are not supported, and only the userids we give you will work.
@@ -86,7 +100,13 @@ Both starttime and endtime must be ISO 8601 timestamps referenced to UTC (exampl
 
 Whitespace and upper/lower case are ignored; the formatting above makes it easier to read but it’s unimportant.
 
-## Running Query's:
+The `WHERE` clause for containment must look like this:
+
+    WHERE fieldname [IN|NOT IN] listOfValues
+
+The `fieldname` can be any supported fieldname in the record; listOfValues is a comma-separated or space-separated list of values for that field. It's intended that fieldname is uploadId and that the values are ID strings; other values may not give the desired results but you're welcome to try.
+
+## Running Queries:
 
 -- use "source" (also known as ".") to load it, as in ```. query_cli```
 
@@ -102,3 +122,4 @@ tp_login <user_name>
 tp_query <userid_to_query> "smbg, cbg" "WHERE time > 2014-11-23T10:25:16"
 ```
 
+There are many more features with this tool -- read the source if you're interested.

@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	VALID_QUERY     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	VALID_QUERY_1   = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	VALID_QUERY_2   = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg WHERE updateId NOT IN abcd, efgh, ijkl SORT BY time AS Timestamp REVERSED"
 	IS_REVERSE      = "blah blah reversed"
 	IS_REVERSE_CASE = "blah blah REVERSED"
 	NOT_REVERSE     = "blah blah"
@@ -74,7 +75,7 @@ func TestMetaQueryWhere(t *testing.T) {
 
 	qd := &QueryData{}
 
-	qd.buildMetaQuery(VALID_QUERY)
+	qd.buildMetaQuery(VALID_QUERY_1)
 
 	if qd.MetaQuery[userid] == "" {
 		t.Fatalf("should be a userid set on [%v]", qd.MetaQuery)
@@ -92,14 +93,14 @@ func TestQueryWhere(t *testing.T) {
 
 	qd := &QueryData{}
 
-	qd.buildWhere(VALID_QUERY)
+	qd.buildTimeWhere(VALID_QUERY_1)
 
-	if len(qd.WhereConditons) != 2 {
-		t.Fatalf("there should be two where conditions got %v", qd.WhereConditons)
+	if len(qd.WhereConditions) != 2 {
+		t.Fatalf("there should be two where conditions got %v", qd.WhereConditions)
 	}
 
-	first := qd.WhereConditons[0]
-	second := qd.WhereConditons[1]
+	first := qd.WhereConditions[0]
+	second := qd.WhereConditions[1]
 
 	if first.Name != "time" || first.Condition != ">" || first.Value != "2015-01-01T00:00:00.000Z" {
 		t.Fatalf("first where  %v doesn't match ", first)
@@ -116,14 +117,14 @@ func TestQueryWhere_Gte(t *testing.T) {
 
 	qd := &QueryData{}
 
-	qd.buildWhere(GTE_QUERY)
+	qd.buildTimeWhere(GTE_QUERY)
 
-	if len(qd.WhereConditons) != 2 {
-		t.Fatalf("there should be two where conditions got %v", qd.WhereConditons)
+	if len(qd.WhereConditions) != 2 {
+		t.Fatalf("there should be two where conditions got %v", qd.WhereConditions)
 	}
 
-	first := qd.WhereConditons[0]
-	second := qd.WhereConditons[1]
+	first := qd.WhereConditions[0]
+	second := qd.WhereConditions[1]
 
 	if first.Name != "time" || first.Condition != ">=" || first.Value != "2015-01-01T00:00:00.000Z" {
 		t.Fatalf("first where  %v doesn't match ", first)
@@ -148,7 +149,7 @@ func TestTypes_GivesError_WhenNoTypes(t *testing.T) {
 func TestTypes(t *testing.T) {
 	qd := &QueryData{}
 
-	qd.buildTypes(VALID_QUERY)
+	qd.buildTypes(VALID_QUERY_1)
 
 	if len(qd.Types) != 3 {
 		t.Fatalf("should listed the three types from query got [%v]", qd.Types)
@@ -190,9 +191,9 @@ func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
 
 }
 
-func TestExtractQueryData(t *testing.T) {
+func TestExtractQueryData1(t *testing.T) {
 
-	errs, qd := BuildQuery(VALID_QUERY)
+	errs, qd := BuildQuery(VALID_QUERY_1)
 
 	if len(errs) != 0 {
 		t.Fatalf("there should be no errors but got %v", errs)
@@ -201,6 +202,24 @@ func TestExtractQueryData(t *testing.T) {
 	if qd.Reverse != true {
 		t.Fatalf("should be reversed")
 	}
+
+	t.Logf("\nRESULT: %v\n\n", qd)
+
+}
+
+func TestExtractQueryData2(t *testing.T) {
+
+	errs, qd := BuildQuery(VALID_QUERY_2)
+
+	if len(errs) != 0 {
+		t.Fatalf("there should be no errors but got %v", errs)
+	}
+
+	if qd.Reverse != true {
+		t.Fatalf("should be reversed")
+	}
+
+	t.Logf("\nRESULT: %v\n\n", qd)
 
 }
 

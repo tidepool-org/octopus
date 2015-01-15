@@ -17,11 +17,11 @@ import (
 var (
 	theTime  = "2014-10-23T10:00:00.000Z"
 	basalsQd = &model.QueryData{
-		MetaQuery:      map[string]string{"userid": "1234"},
-		WhereConditons: []model.WhereCondition{model.WhereCondition{Name: "time", Value: theTime, Condition: "<"}},
-		Types:          []string{"basal"},
-		Sort:           map[string]string{"time": "myTime"},
-		Reverse:        false,
+		MetaQuery:       map[string]string{"userid": "1234"},
+		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "time", Value: theTime, Condition: "<"}},
+		Types:           []string{"basal"},
+		Sort:            map[string]string{"time": "myTime"},
+		Reverse:         false,
 	}
 )
 
@@ -143,14 +143,15 @@ func TestMongoStore(t *testing.T) {
 	}
 }
 
-func TestQueryConstruction(t *testing.T) {
+func TestWhereQueryConstruction(t *testing.T) {
 
 	ourData := &model.QueryData{
-		MetaQuery:      map[string]string{"userid": "1234"},
-		WhereConditons: []model.WhereCondition{model.WhereCondition{Name: "Stuff", Value: "123", Condition: ">"}},
-		Types:          []string{"cbg", "smbg"},
-		Sort:           map[string]string{"time": "myTime"},
-		Reverse:        false,
+		MetaQuery:       map[string]string{"userid": "1234"},
+		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "Stuff", Value: "123", Condition: ">"}},
+		Types:           []string{"cbg", "smbg"},
+		InList:          []string{},
+		Sort:            map[string]string{"time": "myTime"},
+		Reverse:         false,
 	}
 
 	query, sort := constructQuery(ourData)
@@ -177,6 +178,59 @@ func TestQueryConstruction(t *testing.T) {
 	//check the where condition
 	where := meta["Stuff"]
 	expectedWhere := bson.M{"$gt": "123"}
+
+	if reflect.DeepEqual(where, expectedWhere) != true {
+		t.Fatalf("given %v but expected %v", where, expectedWhere)
+	}
+
+	//check the other $or component of the query
+	_meta := query["$or"].([]bson.M)[1]
+
+	if _meta["_groupId"] != "1234" {
+		t.Fatalf("_groupId [%v] should have been set to given 1234", _meta)
+	}
+
+	if _meta["type"] == nil {
+		t.Fatalf("type should have two items [%v]", _meta["type"])
+	}
+
+}
+
+func TestInQueryConstruction(t *testing.T) {
+
+	ourData := &model.QueryData{
+		MetaQuery:       map[string]string{"userid": "1234"},
+		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "updateId", Value: "NOTHING", Condition: "IN"}},
+		Types:           []string{"cbg"},
+		InList:          []string{"firstId", "secondId"},
+		Sort:            map[string]string{"time": "myTime"},
+		Reverse:         false,
+	}
+
+	query, sort := constructQuery(ourData)
+
+	if sort != "time" {
+		t.Fatalf("sort returned [%s] but should be time", sort)
+	}
+
+	//check the meta query
+	meta := query["$or"].([]bson.M)[0]
+
+	if meta["groupId"] != "1234" {
+		t.Fatalf("groupId [%v] should have been set to given 1234", meta)
+	}
+
+	//check the types
+	types := meta["type"]
+	expectedTypes := bson.M{"$in": []string{"cbg"}}
+
+	if reflect.DeepEqual(types, expectedTypes) != true {
+		t.Fatalf("given %v but expected %v", types, expectedTypes)
+	}
+
+	//check the where condition
+	where := meta["updateId"]
+	expectedWhere := bson.M{"$in": []string{"firstId", "secondId"}}
 
 	if reflect.DeepEqual(where, expectedWhere) != true {
 		t.Fatalf("given %v but expected %v", where, expectedWhere)

@@ -11,15 +11,17 @@ const (
 	ERROR_METAQUERY_REQUIRED = "Missing required METAQUERY e.g. METAQUERY WHERE userid IS 12d7bc90"
 	ERROR_SORT_REQUIRED      = "Missing required SORT BY e.g. SORT BY time AS Timestamp"
 	ERROR_TYPES_REQUIRED     = "Missing required TYPE IN e.g. TYPE IN cbg, smbg"
+	INWHERE_PAT              = `(?i)\bQUERY.+\bWHERE +([^ ]*) +(?:(NOT IN|IN) +)(.*)\bSORT`
 )
 
 type (
 	QueryData struct {
-		MetaQuery      map[string]string
-		WhereConditons []WhereCondition
-		Types          []string
-		Sort           map[string]string
-		Reverse        bool
+		MetaQuery       map[string]string
+		WhereConditions []WhereCondition
+		Types           []string
+		InList          []string
+		Sort            map[string]string
+		Reverse         bool
 	}
 	WhereCondition struct {
 		Name      string
@@ -81,13 +83,25 @@ func (qd *QueryData) buildSort(raw string) error {
 	return errors.New(ERROR_SORT_REQUIRED)
 }
 
-func (qd *QueryData) buildWhere(raw string) {
+func (qd *QueryData) isTimeWhere(raw string) bool {
+	where := regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) (AND (.*) (.*) (.*) )?\bSORT`)
+	indices := where.FindStringIndex(raw)
+	return indices != nil
+}
+
+func (qd *QueryData) isInWhere(raw string) bool {
+	where := regexp.MustCompile(INWHERE_PAT)
+	indices := where.FindStringIndex(raw)
+	return indices != nil
+}
+
+func (qd *QueryData) buildTimeWhere(raw string) {
 	where := regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*) \bSORT`)
 	whereData := where.FindStringSubmatch(raw)
 
 	if len(whereData) == 7 {
 
-		qd.WhereConditons = append(qd.WhereConditons,
+		qd.WhereConditions = append(qd.WhereConditions,
 			WhereCondition{
 				Name:      whereData[1],
 				Condition: whereData[2],
@@ -105,7 +119,7 @@ func (qd *QueryData) buildWhere(raw string) {
 		whereData = where.FindStringSubmatch(raw)
 
 		if len(whereData) == 4 {
-			qd.WhereConditons = append(qd.WhereConditons,
+			qd.WhereConditions = append(qd.WhereConditions,
 				WhereCondition{
 					Name:      whereData[1],
 					Condition: whereData[2],
@@ -115,7 +129,28 @@ func (qd *QueryData) buildWhere(raw string) {
 		}
 	}
 
-	log.Printf("buildWhere from [%s] shows no where clause", raw)
+	log.Printf("buildTimeWhere from [%s] shows incorrect or no where clause", raw)
+}
+
+func (qd *QueryData) buildInWhere(raw string) {
+	where := regexp.MustCompile(INWHERE_PAT)
+	whereData := where.FindStringSubmatch(raw)
+
+	if len(whereData) == 4 {
+
+		listre := regexp.MustCompile("[ ,]+")
+		qd.InList = listre.Split(whereData[3], -1)
+
+		qd.WhereConditions = append(qd.WhereConditions,
+			WhereCondition{
+				Name:      whereData[1],
+				Condition: whereData[2],
+				Value:     "NOT USED",
+			})
+		return
+	}
+
+	log.Printf("buildInWhere from [%s] shows incorrect or no where clause", raw)
 }
 
 func (qd *QueryData) buildOrder(raw string) {
@@ -148,7 +183,11 @@ func BuildQuery(raw string) (parseErrs []error, qd *QueryData) {
 	if sortErr := qd.buildSort(raw); sortErr != nil {
 		parseErrs = append(parseErrs, sortErr)
 	}
-	qd.buildWhere(raw)
+	if qd.isInWhere(raw) {
+		qd.buildInWhere(raw)
+	} else if qd.isTimeWhere(raw) {
+		qd.buildTimeWhere(raw)
+	}
 	qd.buildOrder(raw)
 
 	return parseErrs, qd
