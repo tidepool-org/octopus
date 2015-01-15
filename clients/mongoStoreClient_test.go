@@ -28,9 +28,9 @@ var (
 func TestMongoStore(t *testing.T) {
 
 	//we are setting to something other than the default so we can isolate the test data
-	tesingConfig := &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
+	testingConfig := &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 
-	mc := NewMongoStoreClient(tesingConfig)
+	mc := NewMongoStoreClient(testingConfig)
 
 	/*
 	 * INIT THE TEST - we use a clean copy of the collection before we start
@@ -39,7 +39,7 @@ func TestMongoStore(t *testing.T) {
 	mc.deviceDataC.DropCollection()
 
 	if err := mc.deviceDataC.Create(&mgo.CollectionInfo{}); err != nil {
-		t.Fatalf("We couldn't created the device data collection for these tests ", err)
+		t.Fatalf("We couldn't create the device data collection for these tests ", err)
 	}
 
 	/*
