@@ -48,10 +48,34 @@ The result will be 200 response with the MIME type of application/json, containi
 
 The following queries are written as if they were using [TQL](http://developer.tidepool.io/queries-and-notifications/), but they are not -- the query parser for this release expects these queries and no others, and only parts of these queries are recognized. Please don’t expect to experiment with the query language yet, as it won’t accept variation.
 
+### Supported Query Formats:
+
+These are the two supported metaquery formats where you can use either the tidepool user's id or the email address associated with the users account
+
+METAQUERY
+    WHERE userid IS 12d7bc90fa
+    ...
+
+METAQUERY
+    WHERE emails CONTAINS foo@bar.com
+    ...
+
+
+### Query Examples:
+
 Query to get all of a user’s update records:
 
     METAQUERY
         WHERE userid IS 12d7bc90fa
+
+    QUERY
+        TYPE IN update
+        SORT BY time AS Timestamp REVERSED
+
+Query to get all of a user’s update records using the email address
+
+    METAQUERY
+        WHERE emails CONTAINS foo@bar.com
 
     QUERY
         TYPE IN update
