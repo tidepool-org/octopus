@@ -5,12 +5,13 @@ import (
 )
 
 const (
-	QUERY_WHERE_AND = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
-	QUERY_WHERE     = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
-	QUERY_WHERE_IN  = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg WHERE updateId NOT IN abcd, efgh, ijkl SORT BY time AS Timestamp REVERSED"
-	IS_REVERSE      = "blah blah reversed"
-	IS_REVERSE_CASE = "blah blah REVERSED"
-	NOT_REVERSE     = "blah blah"
+	QUERY_WHERE_AND  = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	QUERY_WHERE      = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	METAQUERY_EMAILS = "METAQUERY WHERE emails CONTAINS foo@bar.com QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	QUERY_WHERE_IN   = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg WHERE updateId NOT IN abcd, efgh, ijkl SORT BY time AS Timestamp REVERSED"
+	IS_REVERSE       = "blah blah reversed"
+	IS_REVERSE_CASE  = "blah blah REVERSED"
+	NOT_REVERSE      = "blah blah"
 )
 
 func TestReverse_True(t *testing.T) {
@@ -72,18 +73,48 @@ func TestMetaQuery_GivesError_WhenNoWhereIs(t *testing.T) {
 
 func TestMetaQueryWhere(t *testing.T) {
 
-	const userid, givenId = "userid", "12d7bc90fa"
+	const givenId = "12d7bc90fa"
 
 	qd := &QueryData{}
 
 	qd.buildMetaQuery(QUERY_WHERE)
 
-	if qd.MetaQuery[userid] == "" {
+	if qd.GetMetaQueryId() == "" {
 		t.Fatalf("should be a userid set on [%v]", qd.MetaQuery)
 	}
 
-	if qd.MetaQuery[userid] != givenId {
+	if qd.GetMetaQueryId() != givenId {
 		t.Fatalf("the user id should have been %s, on [%v]", givenId, qd.MetaQuery)
+	}
+
+}
+
+func TestMetaQueryWhere_Emails(t *testing.T) {
+
+	const givenEmail = "foo@bar.com"
+
+	qd := &QueryData{}
+
+	qd.buildMetaQuery(METAQUERY_EMAILS)
+
+	if qd.GetMetaQueryId() == "" {
+		t.Fatalf("should be a emails set on [%v]", qd.MetaQuery)
+	}
+
+	if qd.GetMetaQueryId() != givenEmail {
+		t.Fatalf("the email should have been %s, on [%v]", givenEmail, qd.MetaQuery)
+	}
+
+}
+
+func TestMetaQueryWhere_Bad(t *testing.T) {
+
+	const METAQUERY_BAD = "METAQUERY WHERE bad IS wrong QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
+
+	qd := &QueryData{}
+
+	if err := qd.buildMetaQuery(METAQUERY_BAD); err == nil {
+		t.Fatalf("the meta query [%s] was badly formed and should have given an error", qd.MetaQuery)
 	}
 
 }
@@ -220,7 +251,7 @@ func TestBuildQuery_WithWhereAnd(t *testing.T) {
 		t.Fatalf("there should be no errors but got %v", errs)
 	}
 
-	if qd.MetaQuery["userid"] != "12d7bc90fa" {
+	if qd.MetaQuery[ANYID] != "12d7bc90fa" {
 		t.Fatalf("userid should be 12d7bc90fa but %v", qd.MetaQuery)
 	}
 
@@ -268,7 +299,7 @@ func TestBuildQuery_WithWhere(t *testing.T) {
 		t.Fatalf("there should be no errors but got %v", errs)
 	}
 
-	if qd.MetaQuery["userid"] != "12d7bc90fa" {
+	if qd.GetMetaQueryId() != "12d7bc90fa" {
 		t.Fatalf("userid should be 12d7bc90fa but %v", qd.MetaQuery)
 	}
 
@@ -312,7 +343,7 @@ func TestBuildQuery_WithWhereIn(t *testing.T) {
 		t.Fatalf("there should be no errors but got %v", errs)
 	}
 
-	if qd.MetaQuery["userid"] != "12d7bc90fa" {
+	if qd.GetMetaQueryId() != "12d7bc90fa" {
 		t.Fatalf("userid should be 12d7bc90fa but %v", qd.MetaQuery)
 	}
 

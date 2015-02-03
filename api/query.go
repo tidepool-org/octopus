@@ -62,11 +62,11 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 			} else {
 
-				if pairId, err := a.getUserPairId(qd.MetaQuery["userid"], a.getToken(req)); err != nil {
+				if pairId, err := a.getUserPairId(qd.GetMetaQueryId(), a.getToken(req)); err != nil {
 					a.sendModelAsResWithStatus(res, err, http.StatusBadRequest)
 					return
 				} else {
-					qd.MetaQuery["userid"] = pairId
+					qd.SetMetaQueryId(pairId)
 				}
 
 				log.Printf("Query: data used [%v]", qd)
