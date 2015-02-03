@@ -16,6 +16,22 @@ const (
 	ERROR_GETTING_UPLOAD_ID = "userid not found"
 )
 
+//givenId could be the actual id or the users email address which we also treat as an id
+func (a *Api) getUserPairId(givenId, token string) (string, error) {
+
+	if usr, err := a.ShorelineClient.GetUser(givenId, token); err != nil {
+		log.Printf("getUserPairId: error [%s] getting user id [%s]", err.Error(), givenId)
+		return "", &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_GETTING_UPLOAD_ID)}
+	} else {
+		if pair := a.SeagullClient.GetPrivatePair(usr.UserID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
+			log.Printf("getUserPairId: error GetPrivatePair")
+			return "", &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_GETTING_UPLOAD_ID)}
+		} else {
+			return pair.ID, nil
+		}
+	}
+}
+
 // http.StatusOK
 // http.StatusBadRequest
 // http.StatusUnauthorized
@@ -46,12 +62,11 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 			} else {
 
-				if pair := a.SeagullClient.GetPrivatePair(qd.MetaQuery["userid"], "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
-					statusErr := &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_GETTING_UPLOAD_ID)}
-					a.sendModelAsResWithStatus(res, statusErr, http.StatusBadRequest)
+				if pairId, err := a.getUserPairId(qd.MetaQuery["userid"], a.getToken(req)); err != nil {
+					a.sendModelAsResWithStatus(res, err, http.StatusBadRequest)
 					return
 				} else {
-					qd.MetaQuery["userid"] = pair.ID
+					qd.MetaQuery["userid"] = pairId
 				}
 
 				log.Printf("Query: data used [%v]", qd)
