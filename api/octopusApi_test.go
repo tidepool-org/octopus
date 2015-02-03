@@ -78,6 +78,10 @@ func (slc MockShorelineClient) TokenProvide() string {
 	return FAKE_TOKEN
 }
 
+func (slc MockShorelineClient) GetUser(userID, token string) (string, error) {
+	return userID, nil
+}
+
 func (sgc MockSeagullClient) GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair {
 	return &commonClients.PrivatePair{FAKE_GROUP_ID, FAKE_VALUE}
 }
