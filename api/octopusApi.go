@@ -39,6 +39,7 @@ type (
 
 	ShorelineInterface interface {
 		CheckToken(token string) *shoreline.TokenData
+		GetUser(userID, token string) (*shoreline.UserData, error)
 		TokenProvide() string
 	}
 
@@ -77,8 +78,7 @@ func (a *Api) userCanViewData(userID, groupID string) bool {
 //find and validate the token
 func (a *Api) authorized(req *http.Request) bool {
 
-	if token := req.Header.Get(SESSION_TOKEN); token != "" {
-
+	if token := a.getToken(req); token != "" {
 		if td := a.ShorelineClient.CheckToken(token); td == nil {
 			return false
 		}
@@ -86,6 +86,11 @@ func (a *Api) authorized(req *http.Request) bool {
 		return true
 	}
 	return false
+}
+
+//just return the token
+func (a *Api) getToken(req *http.Request) string {
+	return req.Header.Get(SESSION_TOKEN)
 }
 
 func (a *Api) authorizeAndGetGroupId(res http.ResponseWriter, req *http.Request, vars httpVars) (string, error) {

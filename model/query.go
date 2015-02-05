@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	ERROR_METAQUERY_REQUIRED = "Missing required METAQUERY e.g. METAQUERY WHERE userid IS 12d7bc90"
+	ERROR_METAQUERY_REQUIRED = "Missing required METAQUERY e.g. METAQUERY WHERE userid IS 12d7bc90 or  METAQUERY WHERE emails CONTAINS foo@bar.org"
 	ERROR_SORT_REQUIRED      = "Missing required SORT BY e.g. SORT BY time AS Timestamp"
 	ERROR_TYPES_REQUIRED     = "Missing required TYPE IN e.g. TYPE IN cbg, smbg"
 	INWHERE_PAT              = `(?i)\bQUERY.+\bWHERE +([^ ]*) +(?:(NOT IN|IN) +)(.*)\bSORT`
+	ANYID                    = "anyid" // as an we can use either the userid or an email as an 'id' here
 )
 
 type (
@@ -30,16 +31,38 @@ type (
 	}
 )
 
-func (qd *QueryData) buildMetaQuery(raw string) error {
-	meta := regexp.MustCompile(`(?i)\bMETAQUERY WHERE (.*) IS (.*) \bQUERY`)
-	data := meta.FindStringSubmatch(raw)
+func (qd *QueryData) GetMetaQueryId() string {
+	return qd.MetaQuery[ANYID]
+}
 
-	if len(data) == 3 {
-		qd.MetaQuery = map[string]string{data[1]: data[2]}
+func (qd *QueryData) SetMetaQueryId(anyid string) {
+	qd.MetaQuery[ANYID] = anyid
+}
+
+func (qd *QueryData) buildMetaQuery(raw string) error {
+
+	const USERID, EMAILS = "userid", "emails"
+
+	useridMeta := regexp.MustCompile(`(?i)\bMETAQUERY WHERE (.*) IS (.*) \bQUERY`)
+	useridData := useridMeta.FindStringSubmatch(raw)
+
+	if len(useridData) == 3 && useridData[1] == USERID {
+		qd.MetaQuery = map[string]string{ANYID: useridData[2]}
 		return nil
+	} else {
+		//if it is not a userid see if its an email
+		emailsMeta := regexp.MustCompile(`(?i)\bMETAQUERY WHERE (.*) CONTAINS (.*) \bQUERY`)
+		emailsData := emailsMeta.FindStringSubmatch(raw)
+
+		if len(emailsData) == 3 && emailsData[1] == EMAILS {
+			qd.MetaQuery = map[string]string{ANYID: emailsData[2]}
+			return nil
+		}
+		log.Printf("buildMetaQuery from %v gives error [%s]", emailsData, ERROR_METAQUERY_REQUIRED)
+		return errors.New(ERROR_METAQUERY_REQUIRED)
 	}
 
-	log.Printf("buildMetaQuery from %v gives error [%s]", data, ERROR_METAQUERY_REQUIRED)
+	log.Printf("buildMetaQuery from %v gives error [%s]", useridData, ERROR_METAQUERY_REQUIRED)
 	return errors.New(ERROR_METAQUERY_REQUIRED)
 }
 
