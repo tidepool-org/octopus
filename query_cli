@@ -1,14 +1,14 @@
 # == BSD2 LICENSE ==
 # Copyright (c) 2015, Tidepool Project
-# 
+#
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the associated License, which is identical to the BSD 2-Clause
 # License as published by the Open Source Initiative at opensource.org.
-# 
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE. See the License for more details.
-# 
+#
 # You should have received a copy of the License along with this program; if
 # not, you can obtain one from Tidepool Project at tidepool.org.
 # == BSD2 LICENSE ==
@@ -25,8 +25,6 @@
 
 # Use the first line if you're running a local server.
 # Most people will use the second for Tidepool's dev server.
-TIDEPOOL_SERVER="http://localhost:8009"
-#TIDEPOOL_SERVER="https://devel-api.tidepool.io"
 #
 #
 # Usage example:
@@ -38,6 +36,8 @@ TIDEPOOL_SERVER="http://localhost:8009"
 # Enter host password for user 'c@c.com':
 # {"userid":"467c4642d5","username":"c@c.com","emails":["c@c.com"]}
 # You're now logged in.
+#
+# At this point, the email is set as the default userid. You can change it:
 #
 # $ tp_setuser 467c4642d5
 # User ID now set to '467c4642d5'.
@@ -67,7 +67,21 @@ TIDEPOOL_SERVER="http://localhost:8009"
 # tp_query 467c4642d5 cbg "WHERE time > 2014-08-20T00:00:00.000Z AND time < 2014-08-21T00:00:00.000Z"
 
 
+tp_setserver() {
+    if [ "$1" = "local" ]; then
+        TIDEPOOL_SERVER="http://localhost:8009"
+    elif [ "$1" = "devel" ]; then
+        TIDEPOOL_SERVER="https://devel-api.tidepool.io"
+    elif [ "$1" = "staging" ]; then
+        TIDEPOOL_SERVER="https://staging-api.tidepool.io"
+    elif [ "$1" = "prod" ]; then
+        TIDEPOOL_SERVER="https://api.tidepool.io"
+    else
+        echo "you must specify local, devel, staging, or prod"
+    fi
+}
 
+tp_setserver devel
 
 # Login to the tidepool-platfrom and get a session-token
 tp_login() {
@@ -90,6 +104,8 @@ tp_login() {
         echo "Something went wrong trying to login. Bad password? Wrong server?"
         return
     fi
+    # let's save the user id for you
+    export TP_USERID=$1
     echo ""
     echo "You're now logged in."
 }
@@ -103,11 +119,15 @@ tp_logout() {
 
 tp_setuser() {
     if [ -z "$1" ]; then
-        echo "we need the id of the user whose data you are querying i.e. tp_user <userid>"
+        if [ -z "$TP_USERID" ]; then
+            echo "we need the id of the user whose data you are querying i.e. tp_user <userid>"
+        else
+            echo "Current User ID is '$TP_USERID'"
+        fi
         return
     fi
     export TP_USERID=$1
-    echo "User ID now set to '$TP_USERID'".
+    echo "User ID now set to '$TP_USERID'"
 }
 
 tp_settypes() {
@@ -116,7 +136,7 @@ tp_settypes() {
     else
         export TP_QUERYTYPES=$1
     fi
-    echo "Query types now set to '$TP_QUERYTYPES'".
+    echo "Query types now set to '$TP_QUERYTYPES'"
 }
 
 tp_setstartdate() {
@@ -245,3 +265,57 @@ tp_inquery() {
         curl -X POST -H "$LOGIN_TOKEN" -d "$QUERY" $TIDEPOOL_SERVER/query/data
     fi
 }
+
+tp() {
+    if [ "$1" = "help" -o "$1" = "" -o "$1" = "-?" ]; then
+        echo "Helps you do certain structured queries to Tidepool servers."
+        echo "Supported commands: "
+        echo "   tp login email@addr.com"
+        echo "   tp setserver SERVER -- SERVER can be local, devel, staging, or prod"
+        echo "   tp setuser USERID"
+        echo "   tp settypes RECORDTYPES -- e.g, 'cbg, upload'"
+        echo "   tp setstartdate YYYY-MM-DD"
+        echo "   tp setenddate YYYY-MM-DD"
+        echo "   tp query -- runs a normal query"
+        echo "   tp inquery -- runs an IN query"
+        echo "   tp raw -- runs the text specified, as a query, without a confirmation prompt."
+
+    elif [ "$1" = "setserver" ]; then
+        shift
+        tp_setserver $*
+        echo TIDEPOOL_SERVER is now $TIDEPOOL_SERVER
+    elif [ "$1" = "setuser" ]; then
+        shift
+        tp_setuser $*
+    elif [ "$1" = "login" ]; then
+        shift
+        tp_login $*
+    elif [ "$1" = "logout" ]; then
+        shift
+        tp_logout $*
+    elif [ "$1" = "settypes" ]; then
+        shift
+        tp_settypes $*
+    elif [ "$1" = "setstartdate" ]; then
+        shift
+        tp_setstartdate $*
+    elif [ "$1" = "setenddate" ]; then
+        shift
+        tp_setenddate $*
+    elif [ "$1" = "query" ]; then
+        shift
+        tp_query $*
+    elif [ "$1" = "inquery" ]; then
+        shift
+        tp_inquery $*
+    elif [ "$1" = "raw" ]; then
+        shift
+        QUERY=$*
+        curl -s -X POST -H "$LOGIN_TOKEN" -d "$QUERY" $TIDEPOOL_SERVER/query/data
+    else
+        echo "command '$1' not understood. Type 'tp help' for help."
+    fi
+}
+
+echo "Type 'tp help' for help."
+
