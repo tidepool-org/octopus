@@ -175,7 +175,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 
 	startTime := time.Now()
 
-	query, sort := constructQuery(details) //constructQuery(details)
+	query, sort := constructQuery(details)
 	log.Println("ExecuteQuery: mongo query built in [", time.Now().Sub(startTime).Seconds(), "] secs")
 
 	// Request a socket connection from the session to process our query.
