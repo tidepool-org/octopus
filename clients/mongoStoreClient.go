@@ -119,8 +119,8 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	for _, v := range details.MetaQuery {
 		log.Println("constructQuery: create base queries")
 		//base query
-		queryThat := bson.M{"groupId": v}
-		queryThis := bson.M{"_groupId": v, "_active": true}
+		queryThis := bson.M{"groupId": v}
+		queryThat := bson.M{"_groupId": v, "_active": true}
 		//add types
 		if len(details.Types) > 0 {
 			log.Println("constructQuery: adding types")

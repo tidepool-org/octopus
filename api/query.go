@@ -75,7 +75,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 			if errs, qd := model.BuildQuery(query); len(errs) != 0 {
 
 				log.Printf("Query: errors [%v] found parsing raw query [%s]", errs, query)
-				log.Println("Query: failed afte [", time.Now().Sub(start).Seconds(), "] secs")
+				log.Println("Query: failed after [", time.Now().Sub(start).Seconds(), "] secs")
 
 				statusErr := &status.StatusError{status.NewStatus(http.StatusBadRequest, fmt.Sprintf("Errors building query: [%v]", errs))}
 				a.sendModelAsResWithStatus(res, statusErr, http.StatusBadRequest)
@@ -94,7 +94,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 				result := a.Store.ExecuteQuery(qd)
 
-				log.Println("Query: successfully complete in [", time.Now().Sub(start).Seconds(), "] secs")
+				log.Println("Query: completed in [", time.Now().Sub(start).Seconds(), "] secs")
 
 				res.WriteHeader(http.StatusOK)
 				res.Write(result)

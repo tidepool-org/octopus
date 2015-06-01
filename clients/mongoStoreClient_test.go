@@ -166,8 +166,8 @@ func TestWhereQueryConstruction(t *testing.T) {
 	//check the meta query
 	meta := query["$or"].([]bson.M)[0]
 
-	if meta["groupId"] != "1234" {
-		t.Fatalf("groupId [%v] should have been set to given 1234", meta)
+	if meta["_groupId"] != "1234" {
+		t.Fatalf("groupId [%v] should have been set to given 1234", meta["_groupId"])
 	}
 
 	//check the types
@@ -220,7 +220,7 @@ func TestInQueryConstruction(t *testing.T) {
 	meta := query["$or"].([]bson.M)[0]
 
 	if meta["groupId"] != "1234" {
-		t.Fatalf("groupId [%v] should have been set to given 1234", meta)
+		t.Fatalf("groupId [%v] should have been set to given 1234", meta["groupId"])
 	}
 
 	//check the types
