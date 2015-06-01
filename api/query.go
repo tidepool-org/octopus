@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/tidepool-org/go-common/clients/status"
 
@@ -54,6 +55,8 @@ func (a *Api) getUserPairId(givenId, token string) (string, error) {
 // http.StatusUnauthorized
 func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
+	start := time.Now()
+
 	if a.authorized(req) {
 
 		log.Print("Query: starting ... ")
@@ -72,6 +75,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 			if errs, qd := model.BuildQuery(query); len(errs) != 0 {
 
 				log.Printf("Query: errors [%v] found parsing raw query [%s]", errs, query)
+				log.Println("Query: failed afte [", time.Now().Sub(start).Seconds(), "] secs")
 
 				statusErr := &status.StatusError{status.NewStatus(http.StatusBadRequest, fmt.Sprintf("Errors building query: [%v]", errs))}
 				a.sendModelAsResWithStatus(res, statusErr, http.StatusBadRequest)
@@ -89,6 +93,8 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 				log.Printf("Query: data used [%v]", qd)
 
 				result := a.Store.ExecuteQuery(qd)
+
+				log.Println("Query: successfully complete in [", time.Now().Sub(start).Seconds(), "] secs")
 
 				res.WriteHeader(http.StatusOK)
 				res.Write(result)
