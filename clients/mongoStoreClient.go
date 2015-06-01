@@ -157,8 +157,7 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 			}
 		}
 
-		//query = bson.M{"$or": []bson.M{queryThis, queryThat}}
-		query = queryThis
+		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
 		log.Printf("constructQuery: full query is %v", query)
 	}
 	//sort field and order
@@ -172,40 +171,12 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	return query, sort
 }
 
-func constructSimpleQuery(details *model.QueryData) (query bson.M, sort string) {
-	//query
-	for _, v := range details.MetaQuery {
-		log.Println("constructQuery: create base queries")
-		//base query
-		query := bson.M{"_groupId": v, "_active": true}
-		//add types
-		if len(details.Types) > 0 {
-			log.Printf("constructQuery: adding types %v ", details.Types)
-			query["type"] = bson.M{"$in": details.Types}
-		}
-		if len(details.InList) > 0 {
-			log.Printf("constructQuery: adding  %v ", details.InList)
-			first := details.WhereConditions[0]
-			switch strings.ToLower(first.Condition) {
-			case "in":
-				query[first.Name] = bson.M{"$in": details.InList}
-			case "not in":
-				query[first.Name] = bson.M{"$nin": details.InList}
-			}
-		}
-
-		log.Printf("constructSimpleQuery: %v", query)
-	}
-
-	return query, "-time"
-}
-
 func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 
 	startTime := time.Now()
 
 	query, sort := constructQuery(details) //constructQuery(details)
-	log.Println("ExecuteQuery: mongo query built in seconds: ", time.Now().Sub(startTime).Seconds())
+	log.Println("ExecuteQuery: mongo query built in [", time.Now().Sub(startTime).Seconds(), "] secs")
 
 	// Request a socket connection from the session to process our query.
 	// Close the session when the goroutine exits and put the connection back
