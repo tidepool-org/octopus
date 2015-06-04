@@ -19,6 +19,7 @@ package clients
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -117,18 +118,15 @@ func getMongoOperator(op string) string {
 func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	//query
 	for _, v := range details.MetaQuery {
-		log.Println("constructQuery: create base queries")
 		//base query
 		queryThis := bson.M{"groupId": v}
 		queryThat := bson.M{"_groupId": v, "_active": true}
 		//add types
 		if len(details.Types) > 0 {
-			log.Println("constructQuery: adding types")
 			queryThis["type"] = bson.M{"$in": details.Types}
 			queryThat["type"] = bson.M{"$in": details.Types}
 		}
 		if len(details.InList) > 0 {
-			log.Println("constructQuery: adding inlist")
 			first := details.WhereConditions[0]
 			switch strings.ToLower(first.Condition) {
 			case "in":
@@ -138,16 +136,13 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 			}
 			queryThat[first.Name] = queryThis[first.Name]
 		} else {
-
 			//add where but only if there wasn't an InList
 			if len(details.WhereConditions) == 1 {
-				log.Println("constructQuery: where statement with just one condition")
 				first := details.WhereConditions[0]
 				op := getMongoOperator(first.Condition)
 				queryThis[first.Name] = bson.M{op: first.Value}
 				queryThat[first.Name] = bson.M{op: first.Value}
 			} else if len(details.WhereConditions) == 2 {
-				log.Println("constructQuery: where statement with two conditions")
 				first := details.WhereConditions[0]
 				op1 := getMongoOperator(first.Condition)
 				second := details.WhereConditions[1]
@@ -158,7 +153,7 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 		}
 
 		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
-		log.Printf("constructQuery: full query is %v", query)
+		log.Printf("constructQuery: mongo query %#v", query)
 	}
 	//sort field and order
 	for k := range details.Sort {
@@ -176,7 +171,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	startTime := time.Now()
 
 	query, sort := constructQuery(details)
-	log.Println("ExecuteQuery: mongo query built in [", time.Now().Sub(startTime).Seconds(), "] secs")
+	log.Println(fmt.Sprintf("ExecuteQuery: mongo query built in [%.5f] secs", time.Now().Sub(startTime).Seconds()))
 
 	// Request a socket connection from the session to process our query.
 	// Close the session when the goroutine exits and put the connection back
@@ -196,7 +191,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 		Select(filter).
 		All(&results)
 
-	log.Println("ExecuteQuery: mongo query took [", time.Now().Sub(startQueryTime).Seconds(), "] secs and returned [", len(results), "] records")
+	log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
 
 	if len(results) == 0 {
 		return []byte("[]")
