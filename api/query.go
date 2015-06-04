@@ -38,11 +38,11 @@ const (
 func (a *Api) getUserPairId(givenId, token string) (string, error) {
 
 	if usr, err := a.ShorelineClient.GetUser(givenId, token); err != nil {
-		log.Printf("getUserPairId: error [%s] getting user id [%s]", err.Error(), givenId)
+		log.Println(QUERY_API_PREFIX, fmt.Sprintf("getUserPairId: error [%s] getting user id [%s]", err.Error(), givenId))
 		return "", &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_GETTING_UPLOAD_ID)}
 	} else {
 		if pair := a.SeagullClient.GetPrivatePair(usr.UserID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
-			log.Printf("getUserPairId: error GetPrivatePair")
+			log.Println(QUERY_API_PREFIX, "getUserPairId: ", ERROR_GETTING_UPLOAD_ID)
 			return "", &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_GETTING_UPLOAD_ID)}
 		} else {
 			return pair.ID, nil
@@ -59,23 +59,23 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 	if a.authorized(req) {
 
-		log.Print("Query: starting ... ")
+		log.Println(QUERY_API_PREFIX, "Query: starting ... ")
 
 		defer req.Body.Close()
 		if rawQuery, err := ioutil.ReadAll(req.Body); err != nil || string(rawQuery) == "" {
-			log.Printf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body)
+			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body))
 			statusErr := &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_READING_QUERY)}
 			a.sendModelAsResWithStatus(res, statusErr, http.StatusBadRequest)
 			return
 		} else {
 			query := string(rawQuery)
 
-			log.Printf("Query: to execute [%s] ", query)
+			log.Println(QUERY_API_PREFIX, "Query: raw query = ", query)
 
 			if errs, qd := model.BuildQuery(query); len(errs) != 0 {
 
-				log.Printf("Query: errors [%v] found parsing raw query [%s]", errs, query)
-				log.Println("Query: failed after [", time.Now().Sub(start).Seconds(), "] secs")
+				log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: errors [%v] found parsing raw query [%s]", errs, query))
+				log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
 
 				statusErr := &status.StatusError{status.NewStatus(http.StatusBadRequest, fmt.Sprintf("Errors building query: [%v]", errs))}
 				a.sendModelAsResWithStatus(res, statusErr, http.StatusBadRequest)
@@ -90,11 +90,9 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 					qd.SetMetaQueryId(pairId)
 				}
 
-				log.Printf("Query: data used [%v]", qd)
-
 				result := a.Store.ExecuteQuery(qd)
 
-				log.Println("Query: completed in [", time.Now().Sub(start).Seconds(), "] secs")
+				log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 
 				res.WriteHeader(http.StatusOK)
 				res.Write(result)
@@ -102,7 +100,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 	}
-	log.Print("Query: failed authorization")
+	log.Print(QUERY_API_PREFIX, "Query: failed authorization")
 	res.WriteHeader(http.StatusUnauthorized)
 	return
 }

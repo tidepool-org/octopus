@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	SESSION_TOKEN = "x-tidepool-session-token"
+	SESSION_TOKEN    = "x-tidepool-session-token"
+	QUERY_API_PREFIX = "api/query"
 )
 
 type (
@@ -149,7 +150,7 @@ func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 
 func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 	if err := a.Store.Ping(); err != nil {
-		log.Println(err)
+		log.Println(QUERY_API_PREFIX, "GetStatus ", err)
 		res.WriteHeader(http.StatusInternalServerError)
 		res.Write([]byte(err.Error()))
 		return
