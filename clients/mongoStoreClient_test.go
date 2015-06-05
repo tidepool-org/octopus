@@ -40,12 +40,10 @@ var (
 		Sort:            map[string]string{"time": "myTime"},
 		Reverse:         false,
 	}
+	testingConfig = &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 )
 
 func TestMongoStore(t *testing.T) {
-
-	//we are setting to something other than the default so we can isolate the test data
-	testingConfig := &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 
 	mc := NewMongoStoreClient(testingConfig)
 
@@ -141,6 +139,34 @@ func TestMongoStore(t *testing.T) {
 
 		if second["rate"] != 0.4 {
 			t.Fatalf("second rate [%d] should be 0.4", second["rate"])
+		}
+	}
+
+}
+
+func TestIndexes(t *testing.T) {
+
+	const (
+		//index names based on feilds used
+		std_query_idx      = "_groupId_1__active_1_type_1_time_-1"
+		uploadid_query_idx = "_groupId_1__active_1_type_1_uploadId_1_time_-1"
+	)
+	mc := NewMongoStoreClient(testingConfig)
+
+	if idxs, err := mc.deviceDataC.Indexes(); err != nil {
+		t.Fatalf("TestIndexes unexpected error ", err.Error())
+	} else {
+		// there are the two we have added and also the standard index
+		if len(idxs) != 3 {
+			t.Fatalf("TestIndexes should be 3 but found [%d] ", len(idxs))
+		}
+
+		if idxs[0].Name != std_query_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", std_query_idx, idxs[0].Name)
+		}
+
+		if idxs[1].Name != uploadid_query_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", uploadid_query_idx, idxs[1].Name)
 		}
 	}
 
