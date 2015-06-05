@@ -133,10 +133,9 @@ func getMongoOperator(op string) string {
 }
 
 func constructQuery(details *model.QueryData) (query bson.M, sort string) {
-	//query
 	for _, v := range details.MetaQuery {
 		//base query
-		query := bson.M{"_groupId": v, "_active": true}
+		query = bson.M{"_groupId": v, "_active": true}
 		//add types
 		if len(details.Types) > 0 {
 			query["type"] = bson.M{"$in": details.Types}
