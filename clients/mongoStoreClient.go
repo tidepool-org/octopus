@@ -50,7 +50,6 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 	//Note 1:  the order of the fields is important and should match query order
 	//Note 2:  '-time' is the field we are sorting on must be the last field in the index
 	queryIndex := mgo.Index{
-		Name:       "octopus_query",
 		Key:        []string{"_groupId", "_active", "type", "-time"},
 		Background: true,
 	}
@@ -58,7 +57,6 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 
 	//As above but includes uploadId for restriction of data returned
 	queryUploadIdIndex := mgo.Index{
-		Name:       "octopus_query_uploadId",
 		Key:        []string{"_groupId", "_active", "type", "uploadId", "-time"},
 		Background: true,
 	}
