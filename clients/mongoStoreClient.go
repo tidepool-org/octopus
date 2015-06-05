@@ -47,6 +47,23 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 		log.Fatal(err)
 	}
 
+	//Note 1:  the order of the fields is important and should match query order
+	//Note 2:  '-time' is the field we are sorting on must be the last field in the index
+	queryIndex := mgo.Index{
+		Name:       "octopus_query",
+		Key:        []string{"_groupId", "_active", "type", "-time"},
+		Background: true,
+	}
+	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryIndex)
+
+	//As above but includes uploadId for restriction of data returned
+	queryUploadIdIndex := mgo.Index{
+		Name:       "octopus_query_uploadId",
+		Key:        []string{"_groupId", "_active", "type", "uploadId", "-time"},
+		Background: true,
+	}
+	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
+
 	return &MongoStoreClient{
 		session:     mongoSession,
 		deviceDataC: mongoSession.DB("").C(DEVICE_DATA_COLLECTION),
@@ -119,40 +136,33 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	//query
 	for _, v := range details.MetaQuery {
 		//base query
-		queryThis := bson.M{"groupId": v}
-		queryThat := bson.M{"_groupId": v, "_active": true}
+		query := bson.M{"_groupId": v, "_active": true}
 		//add types
 		if len(details.Types) > 0 {
-			queryThis["type"] = bson.M{"$in": details.Types}
-			queryThat["type"] = bson.M{"$in": details.Types}
+			query["type"] = bson.M{"$in": details.Types}
 		}
 		if len(details.InList) > 0 {
 			first := details.WhereConditions[0]
 			switch strings.ToLower(first.Condition) {
 			case "in":
-				queryThis[first.Name] = bson.M{"$in": details.InList}
+				query[first.Name] = bson.M{"$in": details.InList}
 			case "not in":
-				queryThis[first.Name] = bson.M{"$nin": details.InList}
+				query[first.Name] = bson.M{"$nin": details.InList}
 			}
-			queryThat[first.Name] = queryThis[first.Name]
 		} else {
 			//add where but only if there wasn't an InList
 			if len(details.WhereConditions) == 1 {
 				first := details.WhereConditions[0]
 				op := getMongoOperator(first.Condition)
-				queryThis[first.Name] = bson.M{op: first.Value}
-				queryThat[first.Name] = bson.M{op: first.Value}
+				query[first.Name] = bson.M{op: first.Value}
 			} else if len(details.WhereConditions) == 2 {
 				first := details.WhereConditions[0]
 				op1 := getMongoOperator(first.Condition)
 				second := details.WhereConditions[1]
 				op2 := getMongoOperator(second.Condition)
-				queryThis[first.Name] = bson.M{op1: first.Value, op2: second.Value}
-				queryThat[first.Name] = bson.M{op1: first.Value, op2: second.Value}
+				query[first.Name] = bson.M{op1: first.Value, op2: second.Value}
 			}
 		}
-
-		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
 		log.Printf("constructQuery: mongo query %#v", query)
 	}
 	//sort field and order
@@ -180,8 +190,8 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	defer sessionCopy.Close()
 
 	var results []interface{}
-	//we don't want to return the _id
-	filter := bson.M{"_id": 0}
+	//we don't want to return these
+	filter := bson.M{"_id": 0, "_active": 0}
 
 	startQueryTime := time.Now()
 
