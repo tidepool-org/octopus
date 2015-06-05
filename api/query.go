@@ -70,7 +70,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 		} else {
 			query := string(rawQuery)
 
-			log.Println(QUERY_API_PREFIX, "Query: raw query = ", query)
+			log.Println(QUERY_API_PREFIX, "Query: raw ", query)
 
 			if errs, qd := model.BuildQuery(query); len(errs) != 0 {
 
