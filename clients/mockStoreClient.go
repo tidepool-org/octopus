@@ -50,6 +50,6 @@ func (d MockStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string)
 	return []byte("GetTimeLastEntryUserDevice")
 }
 
-func (d MockStoreClient) ExecuteQuery(details *model.QueryData) []byte {
-	return []byte("ExecuteQuery")
+func (d MockStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error) {
+	return []byte("ExecuteQuery"), nil
 }

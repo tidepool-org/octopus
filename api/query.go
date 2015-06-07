@@ -18,7 +18,6 @@ not, you can obtain one from Tidepool Project at tidepool.org.
 package api
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -63,33 +62,39 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 		log.Println(QUERY_API_PREFIX, "Query: starting ... ")
 
 		defer req.Body.Close()
-		if rawQuery, err := ioutil.ReadAll(req.Body); err != nil || string(rawQuery) == "" {
+		rawQuery, err := ioutil.ReadAll(req.Body)
+
+		if err != nil || string(rawQuery) == "" {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body))
-			http.Error(res, errors.New(ERROR_READING_QUERY), http.StatusBadRequest)
+			http.Error(res, ERROR_READING_QUERY, http.StatusBadRequest)
 			return
 		}
 		query := string(rawQuery)
 
 		log.Println(QUERY_API_PREFIX, "Query: raw ", query)
 
-		if errs, qd := model.BuildQuery(query); len(errs) != 0 {
+		errs, qd := model.BuildQuery(query)
 
+		if len(errs) != 0 {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: errors [%v] found parsing raw query [%s]", errs, query))
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-			http.Error(res, errors.New(fmt.Sprintf("Errors building query: [%v]", errs)), http.StatusBadRequest)
+			http.Error(res, fmt.Sprintf("Errors building query: [%v]", errs), http.StatusBadRequest)
 			return
 		}
 
-		if pairId, err := a.getUserPairId(qd.GetMetaQueryId(), a.getToken(req)); err != nil {
-			http.Error(res, err, http.StatusBadRequest)
+		pairId, err := a.getUserPairId(qd.GetMetaQueryId(), a.getToken(req))
+
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		qd.SetMetaQueryId(pairId)
 
-		if result, err := a.Store.ExecuteQuery(qd); err != nil {
+		result, err := a.Store.ExecuteQuery(qd)
+		if err != nil {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-			http.Error(res, err, http.StatusInternalServerError)
+			http.Error(res, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		//
@@ -101,6 +106,6 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 	}
 	log.Print(QUERY_API_PREFIX, "Query: failed authorization")
-	http.Error(res, errors.New("failed authorization"), http.StatusUnauthorized)
+	http.Error(res, "failed authorization", http.StatusUnauthorized)
 	return
 }
