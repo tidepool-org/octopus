@@ -192,22 +192,23 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	startQueryTime := time.Now()
 
-	if err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
 		Sort(sort).
 		Select(filter).
-		All(&results); err != nil {
+		All(&results)
+	if err != nil {
 		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
 		return nil, err
-	} else {
-
-		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
-
-		if len(results) == 0 {
-			return []byte("[]"), nil
-		} else {
-			bytes, _ := json.Marshal(results)
-			return bytes, nil
-		}
 	}
+
+	log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
+
+	if len(results) == 0 {
+		return []byte("[]"), nil
+	} else {
+		bytes, _ := json.Marshal(results)
+		return bytes, nil
+	}
+
 }
