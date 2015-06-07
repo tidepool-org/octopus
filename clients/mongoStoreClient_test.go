@@ -78,7 +78,9 @@ func TestMongoStore(t *testing.T) {
 	/*
 	 * Load test data
 	 */
-	if results := mc.ExecuteQuery(basalsQd); results == nil {
+	if results, err := mc.ExecuteQuery(basalsQd); err != nil {
+		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
+	} else if results == nil {
 		t.Fatalf("no results were found for the query [%v]", basalsQd)
 	} else {
 

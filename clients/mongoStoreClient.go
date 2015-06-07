@@ -173,7 +173,7 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	return query, sort
 }
 
-func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
+func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error) {
 
 	startTime := time.Now()
 
@@ -192,18 +192,22 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 
 	startQueryTime := time.Now()
 
-	sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+	if err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
 		Sort(sort).
 		Select(filter).
-		All(&results)
-
-	log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
-
-	if len(results) == 0 {
-		return []byte("[]")
+		All(&results); err != nil {
+		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
+		return nil, err
 	} else {
-		bytes, _ := json.Marshal(results)
-		return bytes
+
+		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
+
+		if len(results) == 0 {
+			return []byte("[]"), nil
+		} else {
+			bytes, _ := json.Marshal(results)
+			return bytes, nil
+		}
 	}
 }
