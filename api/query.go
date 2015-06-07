@@ -32,6 +32,7 @@ const (
 	error_building_query = "There was an issue trying to build the query to run"
 	error_no_userid      = "userid not found"
 	error_no_permissons  = "permissons not found"
+	error_running_query  = "error running query"
 )
 
 //givenId could be the actual id or the users email address which we also treat as an id
@@ -95,7 +96,8 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 		if err != nil {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-			http.Error(res, err.Error(), http.StatusInternalServerError)
+			log.Println(QUERY_API_PREFIX, "Query:", error_running_query, err.Error())
+			http.Error(res, error_running_query, http.StatusInternalServerError)
 			return
 		}
 		// yay we made it! lets give them what they asked for
