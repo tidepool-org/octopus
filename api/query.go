@@ -18,36 +18,36 @@ not, you can obtain one from Tidepool Project at tidepool.org.
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/tidepool-org/go-common/clients/status"
-
 	"../model"
 )
 
 const (
-	ERROR_READING_QUERY     = "There was an issue trying to build the query to run"
-	ERROR_GETTING_UPLOAD_ID = "userid not found"
+	error_building_query = "There was an issue trying to build the query to run"
+	error_no_userid      = "userid not found"
+	error_no_permissons  = "permissons not found"
 )
 
 //givenId could be the actual id or the users email address which we also treat as an id
 func (a *Api) getUserPairId(givenId, token string) (string, error) {
 
-	if usr, err := a.ShorelineClient.GetUser(givenId, token); err != nil {
+	usr, err := a.ShorelineClient.GetUser(givenId, token)
+	if err != nil {
 		log.Println(QUERY_API_PREFIX, fmt.Sprintf("getUserPairId: error [%s] getting user id [%s]", err.Error(), givenId))
-		return "", &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_GETTING_UPLOAD_ID)}
-	} else {
-		if pair := a.SeagullClient.GetPrivatePair(usr.UserID, "uploads", a.ShorelineClient.TokenProvide()); pair == nil {
-			log.Println(QUERY_API_PREFIX, "getUserPairId: ", ERROR_GETTING_UPLOAD_ID)
-			return "", &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_GETTING_UPLOAD_ID)}
-		} else {
-			return pair.ID, nil
-		}
+		return "", errors.New(error_no_userid)
 	}
+	pair := a.SeagullClient.GetPrivatePair(usr.UserID, "uploads", a.ShorelineClient.TokenProvide())
+	if pair == nil {
+		log.Println(QUERY_API_PREFIX, fmt.Sprintf("getUserPairId: no permissons found for [%s]", usr.UserID))
+		return "", errors.New(error_no_permissons)
+	}
+	return pair.ID, nil
 }
 
 // http.StatusOK
@@ -66,7 +66,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 		if err != nil || string(rawQuery) == "" {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body))
-			http.Error(res, ERROR_READING_QUERY, http.StatusBadRequest)
+			http.Error(res, error_building_query, http.StatusBadRequest)
 			return
 		}
 		query := string(rawQuery)
@@ -92,12 +92,13 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 		qd.SetMetaQueryId(pairId)
 
 		result, err := a.Store.ExecuteQuery(qd)
+
 		if err != nil {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
 			http.Error(res, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		//
+		// yay we made it! lets give them what they asked for
 		log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 		res.Header().Set("content-type", "application/json")
 		res.WriteHeader(http.StatusOK)
