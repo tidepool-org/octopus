@@ -18,6 +18,7 @@ not, you can obtain one from Tidepool Project at tidepool.org.
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -64,43 +65,42 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		if rawQuery, err := ioutil.ReadAll(req.Body); err != nil || string(rawQuery) == "" {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body))
-			statusErr := &status.StatusError{status.NewStatus(http.StatusBadRequest, ERROR_READING_QUERY)}
-			a.sendModelAsResWithStatus(res, statusErr, http.StatusBadRequest)
+			http.Error(res, errors.New(ERROR_READING_QUERY), http.StatusBadRequest)
 			return
-		} else {
-			query := string(rawQuery)
-
-			log.Println(QUERY_API_PREFIX, "Query: raw ", query)
-
-			if errs, qd := model.BuildQuery(query); len(errs) != 0 {
-
-				log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: errors [%v] found parsing raw query [%s]", errs, query))
-				log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-
-				statusErr := &status.StatusError{status.NewStatus(http.StatusBadRequest, fmt.Sprintf("Errors building query: [%v]", errs))}
-				a.sendModelAsResWithStatus(res, statusErr, http.StatusBadRequest)
-				return
-
-			} else {
-
-				if pairId, err := a.getUserPairId(qd.GetMetaQueryId(), a.getToken(req)); err != nil {
-					a.sendModelAsResWithStatus(res, err, http.StatusBadRequest)
-					return
-				} else {
-					qd.SetMetaQueryId(pairId)
-				}
-
-				result := a.Store.ExecuteQuery(qd)
-
-				log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
-
-				res.WriteHeader(http.StatusOK)
-				res.Write(result)
-				return
-			}
 		}
+		query := string(rawQuery)
+
+		log.Println(QUERY_API_PREFIX, "Query: raw ", query)
+
+		if errs, qd := model.BuildQuery(query); len(errs) != 0 {
+
+			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: errors [%v] found parsing raw query [%s]", errs, query))
+			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
+			http.Error(res, errors.New(fmt.Sprintf("Errors building query: [%v]", errs)), http.StatusBadRequest)
+			return
+		}
+
+		if pairId, err := a.getUserPairId(qd.GetMetaQueryId(), a.getToken(req)); err != nil {
+			http.Error(res, err, http.StatusBadRequest)
+			return
+		}
+
+		qd.SetMetaQueryId(pairId)
+
+		if result, err := a.Store.ExecuteQuery(qd); err != nil {
+			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
+			http.Error(res, err, http.StatusInternalServerError)
+			return
+		}
+		//
+		log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
+		res.Header().Set("content-type", "application/json")
+		res.WriteHeader(http.StatusOK)
+		res.Write(result)
+		return
+
 	}
 	log.Print(QUERY_API_PREFIX, "Query: failed authorization")
-	res.WriteHeader(http.StatusUnauthorized)
+	http.Error(res, errors.New("failed authorization"), http.StatusUnauthorized)
 	return
 }
