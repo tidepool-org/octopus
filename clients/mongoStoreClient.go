@@ -19,8 +19,10 @@ package clients
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"labix.org/v2/mgo"
@@ -44,6 +46,21 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//Note 1:  the order of the fields is important and should match query order
+	//Note 2:  '-time' is the field we are sorting on must be the last field in the index
+	queryIndex := mgo.Index{
+		Key:        []string{"_groupId", "_active", "type", "-time"},
+		Background: true,
+	}
+	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryIndex)
+
+	//As above but includes uploadId for restriction of data returned
+	queryUploadIdIndex := mgo.Index{
+		Key:        []string{"_groupId", "_active", "type", "uploadId", "-time"},
+		Background: true,
+	}
+	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
 
 	return &MongoStoreClient{
 		session:     mongoSession,
@@ -114,50 +131,36 @@ func getMongoOperator(op string) string {
 }
 
 func constructQuery(details *model.QueryData) (query bson.M, sort string) {
-	//query
 	for _, v := range details.MetaQuery {
-		log.Println("constructQuery: create base queries")
 		//base query
-		queryThis := bson.M{"groupId": v}
-		queryThat := bson.M{"_groupId": v, "_active": true}
+		query = bson.M{"_groupId": v, "_active": true}
 		//add types
 		if len(details.Types) > 0 {
-			log.Println("constructQuery: adding types")
-			queryThis["type"] = bson.M{"$in": details.Types}
-			queryThat["type"] = bson.M{"$in": details.Types}
+			query["type"] = bson.M{"$in": details.Types}
 		}
 		if len(details.InList) > 0 {
-			log.Println("constructQuery: adding inlist")
 			first := details.WhereConditions[0]
 			switch strings.ToLower(first.Condition) {
 			case "in":
-				queryThis[first.Name] = bson.M{"$in": details.InList}
+				query[first.Name] = bson.M{"$in": details.InList}
 			case "not in":
-				queryThis[first.Name] = bson.M{"$nin": details.InList}
+				query[first.Name] = bson.M{"$nin": details.InList}
 			}
-			queryThat[first.Name] = queryThis[first.Name]
 		} else {
-
 			//add where but only if there wasn't an InList
 			if len(details.WhereConditions) == 1 {
-				log.Println("constructQuery: where statement with just one condition")
 				first := details.WhereConditions[0]
 				op := getMongoOperator(first.Condition)
-				queryThis[first.Name] = bson.M{op: first.Value}
-				queryThat[first.Name] = bson.M{op: first.Value}
+				query[first.Name] = bson.M{op: first.Value}
 			} else if len(details.WhereConditions) == 2 {
-				log.Println("constructQuery: where statement with two conditions")
 				first := details.WhereConditions[0]
 				op1 := getMongoOperator(first.Condition)
 				second := details.WhereConditions[1]
 				op2 := getMongoOperator(second.Condition)
-				queryThis[first.Name] = bson.M{op1: first.Value, op2: second.Value}
-				queryThat[first.Name] = bson.M{op1: first.Value, op2: second.Value}
+				query[first.Name] = bson.M{op1: first.Value, op2: second.Value}
 			}
 		}
-
-		query = bson.M{"$or": []bson.M{queryThis, queryThat}}
-		log.Printf("constructQuery: full query is %v", query)
+		log.Printf("constructQuery: mongo query %#v", query)
 	}
 	//sort field and order
 	for k := range details.Sort {
@@ -170,11 +173,12 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	return query, sort
 }
 
-func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
+func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error) {
+
+	startTime := time.Now()
 
 	query, sort := constructQuery(details)
-
-	log.Printf("ExecuteQuery query[%v] sort[%v]", query, sort)
+	log.Println(fmt.Sprintf("ExecuteQuery: mongo query built in [%.5f] secs", time.Now().Sub(startTime).Seconds()))
 
 	// Request a socket connection from the session to process our query.
 	// Close the session when the goroutine exits and put the connection back
@@ -183,21 +187,28 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	defer sessionCopy.Close()
 
 	var results []interface{}
-	//we don't want to return the _id
-	filter := bson.M{"_id": 0}
+	//we don't want to return these
+	filter := bson.M{"_id": 0, "_active": 0}
 
-	sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+	startQueryTime := time.Now()
+
+	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
 		Sort(sort).
 		Select(filter).
 		All(&results)
+	if err != nil {
+		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
+		return nil, err
+	}
 
-	log.Printf("ExecuteQuery found [%d] results", len(results))
+	log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
 
 	if len(results) == 0 {
-		return []byte("[]")
+		return []byte("[]"), nil
 	} else {
 		bytes, _ := json.Marshal(results)
-		return bytes
+		return bytes, nil
 	}
+
 }

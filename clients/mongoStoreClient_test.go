@@ -40,12 +40,10 @@ var (
 		Sort:            map[string]string{"time": "myTime"},
 		Reverse:         false,
 	}
+	testingConfig = &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 )
 
 func TestMongoStore(t *testing.T) {
-
-	//we are setting to something other than the default so we can isolate the test data
-	testingConfig := &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 
 	mc := NewMongoStoreClient(testingConfig)
 
@@ -80,7 +78,9 @@ func TestMongoStore(t *testing.T) {
 	/*
 	 * Load test data
 	 */
-	if results := mc.ExecuteQuery(basalsQd); results == nil {
+	if results, err := mc.ExecuteQuery(basalsQd); err != nil {
+		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
+	} else if results == nil {
 		t.Fatalf("no results were found for the query [%v]", basalsQd)
 	} else {
 
@@ -146,6 +146,34 @@ func TestMongoStore(t *testing.T) {
 
 }
 
+func TestIndexes(t *testing.T) {
+
+	const (
+		//index names based on feilds used
+		std_query_idx      = "_groupId_1__active_1_type_1_time_-1"
+		uploadid_query_idx = "_groupId_1__active_1_type_1_uploadId_1_time_-1"
+	)
+	mc := NewMongoStoreClient(testingConfig)
+
+	if idxs, err := mc.deviceDataC.Indexes(); err != nil {
+		t.Fatalf("TestIndexes unexpected error ", err.Error())
+	} else {
+		// there are the two we have added and also the standard index
+		if len(idxs) != 3 {
+			t.Fatalf("TestIndexes should be 3 but found [%d] ", len(idxs))
+		}
+
+		if idxs[0].Name != std_query_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", std_query_idx, idxs[0].Name)
+		}
+
+		if idxs[1].Name != uploadid_query_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", uploadid_query_idx, idxs[1].Name)
+		}
+	}
+
+}
+
 func TestWhereQueryConstruction(t *testing.T) {
 
 	ourData := &model.QueryData{
@@ -163,15 +191,15 @@ func TestWhereQueryConstruction(t *testing.T) {
 		t.Fatalf("sort returned [%s] but should be time", sort)
 	}
 
-	//check the meta query
-	meta := query["$or"].([]bson.M)[0]
-
-	if meta["groupId"] != "1234" {
-		t.Fatalf("groupId [%v] should have been set to given 1234", meta)
+	if query["_groupId"] != "1234" {
+		t.Fatalf("_groupId [%v] should have been set to given 1234", query)
 	}
 
-	//check the types
-	types := meta["type"]
+	if query["type"] == nil {
+		t.Fatalf("type should have two items [%v]", query["type"])
+	}
+
+	types := query["type"]
 	expectedTypes := bson.M{"$in": []string{"cbg", "smbg"}}
 
 	if reflect.DeepEqual(types, expectedTypes) != true {
@@ -179,22 +207,11 @@ func TestWhereQueryConstruction(t *testing.T) {
 	}
 
 	//check the where condition
-	where := meta["Stuff"]
+	where := query["Stuff"]
 	expectedWhere := bson.M{"$gt": "123"}
 
 	if reflect.DeepEqual(where, expectedWhere) != true {
 		t.Fatalf("given %v but expected %v", where, expectedWhere)
-	}
-
-	//check the other $or component of the query
-	_meta := query["$or"].([]bson.M)[1]
-
-	if _meta["_groupId"] != "1234" {
-		t.Fatalf("_groupId [%v] should have been set to given 1234", _meta)
-	}
-
-	if _meta["type"] == nil {
-		t.Fatalf("type should have two items [%v]", _meta["type"])
 	}
 
 }
@@ -216,15 +233,12 @@ func TestInQueryConstruction(t *testing.T) {
 		t.Fatalf("sort returned [%s] but should be time", sort)
 	}
 
-	//check the meta query
-	meta := query["$or"].([]bson.M)[0]
-
-	if meta["groupId"] != "1234" {
-		t.Fatalf("groupId [%v] should have been set to given 1234", meta)
+	if query["_groupId"] != "1234" {
+		t.Fatalf("_groupId [%v] should have been set to given 1234", query)
 	}
 
 	//check the types
-	types := meta["type"]
+	types := query["type"]
 	expectedTypes := bson.M{"$in": []string{"cbg"}}
 
 	if reflect.DeepEqual(types, expectedTypes) != true {
@@ -232,22 +246,11 @@ func TestInQueryConstruction(t *testing.T) {
 	}
 
 	//check the where condition
-	where := meta["updateId"]
+	where := query["updateId"]
 	expectedWhere := bson.M{"$in": []string{"firstId", "secondId"}}
 
 	if reflect.DeepEqual(where, expectedWhere) != true {
 		t.Fatalf("given %v but expected %v", where, expectedWhere)
-	}
-
-	//check the other $or component of the query
-	_meta := query["$or"].([]bson.M)[1]
-
-	if _meta["_groupId"] != "1234" {
-		t.Fatalf("_groupId [%v] should have been set to given 1234", _meta)
-	}
-
-	if _meta["type"] == nil {
-		t.Fatalf("type should have two items [%v]", _meta["type"])
 	}
 
 }

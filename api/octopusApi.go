@@ -23,6 +23,7 @@ import (
 	"log"
 	"net/http"
 
+	httpgzip "github.com/daaku/go.httpgzip"
 	"github.com/gorilla/mux"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
@@ -31,7 +32,8 @@ import (
 )
 
 const (
-	SESSION_TOKEN = "x-tidepool-session-token"
+	SESSION_TOKEN    = "x-tidepool-session-token"
+	QUERY_API_PREFIX = "api/query"
 )
 
 type (
@@ -60,14 +62,14 @@ type (
 		TokenProvide() string
 	}
 
-	httpVars map[string]string
-
+	httpVars    map[string]string
 	varsHandler func(http.ResponseWriter, *http.Request, httpVars)
+	gzipHandler func(http.ResponseWriter, *http.Request)
 )
 
 func (a *Api) sendModelAsResWithStatus(res http.ResponseWriter, model interface{}, statusCode int) {
 	if jsonDetails, err := json.Marshal(model); err != nil {
-		log.Printf("Error trying to send [%v]", model)
+		log.Printf(QUERY_API_PREFIX, "Error trying to send [%v]", model)
 		http.Error(res, "Error marshaling data for response", http.StatusInternalServerError)
 	} else {
 		res.Header().Set("content-type", "application/json")
@@ -84,11 +86,10 @@ func (a *Api) userCanViewData(userID, groupID string) bool {
 
 	perms, err := a.GatekeeperClient.UserInGroup(userID, groupID)
 	if err != nil {
-		log.Println("Error looking up user in group", err)
+		log.Println(QUERY_API_PREFIX, "Error looking up user in group", err)
 		return false
 	}
-
-	log.Println(perms)
+	log.Println(QUERY_API_PREFIX, "found perms ", perms)
 	return !(perms["root"] == nil && perms["view"] == nil)
 }
 
@@ -144,12 +145,14 @@ func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 	rtr.HandleFunc("/status", a.GetStatus).Methods("GET")
 	rtr.Handle("/upload/lastentry/{userID}", varsHandler(a.TimeLastEntryUser)).Methods("GET")
 	rtr.Handle("/upload/lastentry/{userID}/{deviceID}", varsHandler(a.TimeLastEntryUserAndDevice)).Methods("GET")
-	rtr.HandleFunc("/data", a.Query).Methods("POST")
+
+	rtr.Handle("/data", httpgzip.NewHandler(gzipHandler(a.Query))).Methods("POST")
+
 }
 
 func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 	if err := a.Store.Ping(); err != nil {
-		log.Println(err)
+		log.Println(QUERY_API_PREFIX, "GetStatus ", err)
 		res.WriteHeader(http.StatusInternalServerError)
 		res.Write([]byte(err.Error()))
 		return
@@ -188,4 +191,8 @@ func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Requ
 func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	h(res, req, vars)
+}
+
+func (h gzipHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	h(res, req)
 }

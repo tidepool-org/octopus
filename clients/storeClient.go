@@ -21,7 +21,7 @@ import "../model"
 
 type StoreClient interface {
 	Close()
-	ExecuteQuery(details *model.QueryData) []byte
+	ExecuteQuery(details *model.QueryData) ([]byte, error)
 	GetTimeLastEntryUser(groupId string) []byte
 	GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte
 	Ping() error
