@@ -40,6 +40,11 @@ type MongoStoreClient struct {
 	deviceDataC *mgo.Collection
 }
 
+//all queries will be built on top of this
+func getBaseQuery(groupId string) bson.M {
+	return bson.M{"_groupId": groupId, "_active": true}
+}
+
 func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 
 	mongoSession, err := mongo.Connect(config)
@@ -83,12 +88,10 @@ func (d MongoStoreClient) Ping() error {
 }
 
 func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
-
 	var result map[string]interface{}
-	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
-		bson.M{"_groupId": groupId, "_active": true}}}
+
 	// Get the entry with the latest time by reverse sorting and taking the first value
-	d.deviceDataC.Find(groupIdQuery).Sort("-time").One(&result)
+	d.deviceDataC.Find(getBaseQuery(groupId)).Sort("-time").One(&result)
 	bytes, err := json.Marshal(result["time"])
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
@@ -100,11 +103,9 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 
 	var result map[string]interface{}
 
-	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
-		bson.M{"_groupId": groupId, "_active": true}}}
 	deviceIdQuery := bson.M{"deviceId": deviceId}
 	// Full query matches groupId and deviceId
-	fullQuery := bson.M{"$and": []bson.M{groupIdQuery, deviceIdQuery}}
+	fullQuery := bson.M{"$and": []bson.M{getBaseQuery(groupId), deviceIdQuery}}
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	d.deviceDataC.Find(fullQuery).Sort("-time").One(&result)
 	bytes, err := json.Marshal(result["time"])
@@ -132,8 +133,8 @@ func getMongoOperator(op string) string {
 
 func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	for _, v := range details.MetaQuery {
-		//base query
-		query = bson.M{"_groupId": v, "_active": true}
+		//start with the base query
+		query = getBaseQuery(v)
 		//add types
 		if len(details.Types) > 0 {
 			query["type"] = bson.M{"$in": details.Types}
