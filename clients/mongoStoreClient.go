@@ -36,8 +36,7 @@ const (
 )
 
 type MongoStoreClient struct {
-	session     *mgo.Session
-	deviceDataC *mgo.Collection
+	session *mgo.Session
 }
 
 //all queries will be built on top of this
@@ -67,10 +66,7 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
 
-	return &MongoStoreClient{
-		session:     mongoSession,
-		deviceDataC: mongoSession.DB("").C(DEVICE_DATA_COLLECTION),
-	}
+	return &MongoStoreClient{session: mongoSession}
 }
 
 func (d MongoStoreClient) Close() {
@@ -87,32 +83,51 @@ func (d MongoStoreClient) Ping() error {
 	return nil
 }
 
-func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
+func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 	var result map[string]interface{}
 
+	sessionCopy := d.session
+	defer sessionCopy.Close()
+
+	startQueryTime := time.Now()
+
+	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+		Find(getBaseQuery(groupId)).
+		Sort("-time").
+		One(&result)
+
 	// Get the entry with the latest time by reverse sorting and taking the first value
-	d.deviceDataC.Find(getBaseQuery(groupId)).Sort("-time").One(&result)
-	bytes, err := json.Marshal(result["time"])
 	if err != nil {
-		log.Print("Failed to marshall event", result, err)
+		log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] secs but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
+		return nil, err
 	}
-	return bytes
+
+	log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
+
+	return json.Marshal(result["time"])
 }
 
-func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte {
+func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) ([]byte, error) {
 
 	var result map[string]interface{}
 
-	deviceIdQuery := bson.M{"deviceId": deviceId}
-	// Full query matches groupId and deviceId
-	fullQuery := bson.M{"$and": []bson.M{getBaseQuery(groupId), deviceIdQuery}}
-	// Get the entry with the latest time by reverse sorting and taking the first value
-	d.deviceDataC.Find(fullQuery).Sort("-time").One(&result)
-	bytes, err := json.Marshal(result["time"])
+	startQueryTime := time.Now()
+	sessionCopy := d.session
+	defer sessionCopy.Close()
+
+	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+		Find(bson.M{"$and": []bson.M{getBaseQuery(groupId), bson.M{"deviceId": deviceId}}}).
+		Sort("-time").
+		One(&result)
+
 	if err != nil {
-		log.Print("Failed to marshall event", result, err)
+		log.Println(fmt.Sprintf("GetTimeLastEntryUserAndDevice: mongo query took [%.5f] secs but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
+		return nil, err
 	}
-	return bytes
+
+	log.Println(fmt.Sprintf("GetTimeLastEntryUserAndDevice: mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
+
+	return json.Marshal(result["time"])
 }
 
 //map to the mongo conditions
@@ -181,17 +196,13 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 	query, sort := constructQuery(details)
 	log.Println(fmt.Sprintf("ExecuteQuery: mongo query built in [%.5f] secs", time.Now().Sub(startTime).Seconds()))
 
-	// Request a socket connection from the session to process our query.
-	// Close the session when the goroutine exits and put the connection back
-	// into the pool.
-	sessionCopy := d.session.Copy()
-	defer sessionCopy.Close()
-
 	var results []interface{}
 	//we don't want to return these
 	filter := bson.M{"_id": 0, "_active": 0}
 
 	startQueryTime := time.Now()
+	sessionCopy := d.session
+	defer sessionCopy.Close()
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
