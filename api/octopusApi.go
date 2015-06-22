@@ -93,6 +93,7 @@ func (a *Api) authorized(req *http.Request) bool {
 }
 
 func (a *Api) userCanViewData(userID, groupID string) bool {
+
 	if userID == groupID {
 		return true
 	}
@@ -102,6 +103,7 @@ func (a *Api) userCanViewData(userID, groupID string) bool {
 		log.Println(QUERY_API_PREFIX, "Error looking up user in group", err)
 		return false
 	}
+
 	log.Println(QUERY_API_PREFIX, "found perms ", perms)
 	return !(perms["root"] == nil && perms["view"] == nil)
 }
@@ -180,9 +182,16 @@ func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars
 		if err != nil {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: failed after [%.5f] secs with error[%s]", time.Now().Sub(start).Seconds(), err.Error()))
 			http.Error(res, err.Error(), http.StatusBadRequest)
+			return
 		}
 		if a.userCanViewData(userId, groupId) {
-			timeLastEntry := a.Store.GetTimeLastEntryUser(groupId)
+			timeLastEntry, err := a.Store.GetTimeLastEntryUser(groupId)
+			if err != nil {
+				log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
+				log.Println(QUERY_API_PREFIX, "TimeLastEntryUser:", error_running_query, err.Error())
+				http.Error(res, error_running_query, http.StatusInternalServerError)
+				return
+			}
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 			res.Header().Set("content-type", "application/json")
 			res.WriteHeader(http.StatusOK)
@@ -212,9 +221,17 @@ func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Requ
 		if err != nil {
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: failed after [%.5f] secs with error[%s]", time.Now().Sub(start).Seconds(), err.Error()))
 			http.Error(res, err.Error(), http.StatusBadRequest)
+			return
 		}
 		if a.userCanViewData(userId, groupId) {
-			timeLastEntry := a.Store.GetTimeLastEntryUserAndDevice(groupId, vars["deviceID"])
+			timeLastEntry, err := a.Store.GetTimeLastEntryUserAndDevice(groupId, vars["deviceID"])
+			if err != nil {
+				log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
+				log.Println(QUERY_API_PREFIX, "TimeLastEntryUserAndDevice:", error_running_query, err.Error())
+				http.Error(res, error_running_query, http.StatusInternalServerError)
+				return
+			}
+
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 			res.Header().Set("content-type", "application/json")
 			res.WriteHeader(http.StatusOK)
