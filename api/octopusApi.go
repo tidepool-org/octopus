@@ -81,16 +81,16 @@ type (
 )
 
 var (
-	error_no_userid         = &detailedError{Status: http.StatusBadRequest, Code: "query_userid_notfound", Message: "userid not found"}
-	error_no_view_permisson = &detailedError{Status: http.StatusForbidden, Code: "query_cant_view", Message: "user is not authorized to view data"}
-	error_not_authorized    = &detailedError{Status: http.StatusUnauthorized, Code: "query_not_authorized", Message: "user is not authorized"}
-	error_building_query    = &detailedError{Status: http.StatusBadRequest, Code: "query_invalid_data", Message: "error building your query"}
+	error_no_userid          = &detailedError{Status: http.StatusBadRequest, Code: "query_userid_notfound", Message: "userid not found"}
+	error_getting_permissons = &detailedError{Status: http.StatusBadRequest, Code: "query_permissons_notfound", Message: "user does not have any permissons"}
+	error_no_view_permisson  = &detailedError{Status: http.StatusForbidden, Code: "query_cant_view", Message: "user does not have permisson to view data"}
+	error_not_authorized     = &detailedError{Status: http.StatusUnauthorized, Code: "query_not_authorized", Message: "user is not authorized"}
+	error_building_query     = &detailedError{Status: http.StatusBadRequest, Code: "query_invalid_data", Message: "error building your query"}
 
 	//generic server errors
-	error_internal_server    = &detailedError{Status: http.StatusInternalServerError, Code: "query_intenal_error", Message: "internal server error"}
-	error_getting_permissons = &detailedError{Status: http.StatusInternalServerError, Code: "query_permissons_error", Message: "internal server error"}
-	error_running_query      = &detailedError{Status: http.StatusInternalServerError, Code: "query_store_error", Message: "internal server error"}
-	error_status_check       = &detailedError{Status: http.StatusInternalServerError, Code: "query_status_check", Message: "internal server error"}
+	error_internal_server = &detailedError{Status: http.StatusInternalServerError, Code: "query_intenal_error", Message: "internal server error"}
+	error_running_query   = &detailedError{Status: http.StatusInternalServerError, Code: "query_store_error", Message: "internal server error"}
+	error_status_check    = &detailedError{Status: http.StatusInternalServerError, Code: "query_status_check", Message: "internal server error"}
 )
 
 //set this from the actual error if applicable
@@ -108,9 +108,10 @@ func jsonError(res http.ResponseWriter, err *detailedError, startedAt time.Time)
 
 	jsonErr, _ := json.Marshal(err)
 
+	res.WriteHeader(err.Status)
 	res.Header().Add("content-type", "application/json")
 	res.Write(jsonErr)
-	res.WriteHeader(err.Status)
+	return
 }
 
 //find and validate the token
@@ -181,6 +182,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 	}
 	log.Println(QUERY_API_PREFIX, fmt.Sprintf("GetStatus: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 	res.Write([]byte("OK"))
+	return
 }
 
 // http.StatusOK, time of last entry
@@ -308,12 +310,14 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 		if detailedErr != nil {
 			jsonError(res, detailedErr, start)
+			return
 		}
 
 		//find the groupId
 		groupId, detailedErr := a.getGroupForQueriedUser(req, qd.GetMetaQueryId())
 		if detailedErr != nil {
 			jsonError(res, detailedErr, start)
+			return
 		}
 
 		qd.SetMetaQueryId(groupId)
