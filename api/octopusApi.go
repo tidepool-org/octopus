@@ -18,7 +18,7 @@ not, you can obtain one from Tidepool Project at tidepool.org.
 package api
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,6 +27,7 @@ import (
 
 	httpgzip "github.com/daaku/go.httpgzip"
 	"github.com/gorilla/mux"
+	"github.com/satori/go.uuid"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
 
@@ -37,13 +38,6 @@ import (
 const (
 	SESSION_TOKEN    = "x-tidepool-session-token"
 	QUERY_API_PREFIX = "api/query"
-
-	//error messages
-	error_building_query           = "There was an issue trying to build the query to run"
-	error_no_userid                = "userid not found"
-	error_no_permissons            = "permissons not found"
-	error_running_query            = "error running query"
-	error_checking_service_prereqs = "error when checking the service pre-reqs"
 )
 
 type (
@@ -72,10 +66,52 @@ type (
 		TokenProvide() string
 	}
 
+	// so we can wrap and marshal the detailed error
+	detailedError struct {
+		Status          int    `json:"status"`
+		Id              string `json:"id"`
+		Code            string `json:"code"`
+		Message         string `json:"message"`
+		InternalMessage string `json:"-"` //used only for logging so we don't want to serialize it out
+	}
+
 	httpVars    map[string]string
 	varsHandler func(http.ResponseWriter, *http.Request, httpVars)
 	gzipHandler func(http.ResponseWriter, *http.Request)
 )
+
+var (
+	error_no_userid         = &detailedError{Status: http.StatusBadRequest, Code: "query_userid_notfound", Message: "userid not found"}
+	error_no_view_permisson = &detailedError{Status: http.StatusForbidden, Code: "query_cant_view", Message: "user is not authorized to view data"}
+	error_not_authorized    = &detailedError{Status: http.StatusUnauthorized, Code: "query_not_authorized", Message: "user is not authorized"}
+	error_building_query    = &detailedError{Status: http.StatusBadRequest, Code: "query_invalid_data", Message: "error building your query"}
+
+	//generic server errors
+	error_internal_server    = &detailedError{Status: http.StatusInternalServerError, Code: "query_intenal_error", Message: "internal server error"}
+	error_getting_permissons = &detailedError{Status: http.StatusInternalServerError, Code: "query_permissons_error", Message: "internal server error"}
+	error_running_query      = &detailedError{Status: http.StatusInternalServerError, Code: "query_store_error", Message: "internal server error"}
+	error_status_check       = &detailedError{Status: http.StatusInternalServerError, Code: "query_status_check", Message: "internal server error"}
+)
+
+//set this from the actual error if applicable
+func (d *detailedError) setInternalMessage(internal error) *detailedError {
+	d.InternalMessage = internal.Error()
+	return d
+}
+
+//log error detail and write as application/json
+func jsonError(res http.ResponseWriter, err *detailedError, startedAt time.Time) {
+
+	err.Id = uuid.NewV4().String()
+
+	log.Println(QUERY_API_PREFIX, fmt.Sprintf("[%s][%s] failed after [%.5f]secs with error [%s][%s] ", err.Id, err.Code, time.Now().Sub(startedAt).Seconds(), err.Message, err.InternalMessage))
+
+	jsonErr, _ := json.Marshal(err)
+
+	res.Header().Add("content-type", "application/json")
+	res.Write(jsonErr)
+	res.WriteHeader(err.Status)
+}
 
 //find and validate the token
 func (a *Api) authorized(req *http.Request) bool {
@@ -113,22 +149,6 @@ func (a *Api) getToken(req *http.Request) string {
 	return req.Header.Get(SESSION_TOKEN)
 }
 
-//givenId could be the actual id or the users email address which we also treat as an id
-func (a *Api) getUserPairId(givenId, token string) (string, error) {
-
-	usr, err := a.ShorelineClient.GetUser(givenId, token)
-	if err != nil {
-		log.Println(QUERY_API_PREFIX, fmt.Sprintf("getUserPairId: error [%s] getting user id [%s]", err.Error(), givenId))
-		return "", errors.New(error_no_userid)
-	}
-	pair := a.SeagullClient.GetPrivatePair(usr.UserID, "uploads", a.ShorelineClient.TokenProvide())
-	if pair == nil {
-		log.Println(QUERY_API_PREFIX, fmt.Sprintf("getUserPairId: no permissons found for [%s]", usr.UserID))
-		return "", errors.New(error_no_permissons)
-	}
-	return pair.ID, nil
-}
-
 func InitApi(cfg Config, slc ShorelineInterface,
 	sgc SeagullInterface, gkc GatekeeperInterface,
 	store clients.StoreClient) *Api {
@@ -156,13 +176,10 @@ func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	if err := a.Store.Ping(); err != nil {
-		log.Println(QUERY_API_PREFIX, fmt.Sprintf("GetStatus: failed after [%.5f] secs with error[%s]", time.Now().Sub(start).Seconds(), err.Error()))
-		//don't want to leak the actual error - we have logged it above
-		http.Error(res, error_checking_service_prereqs, http.StatusInternalServerError)
+		jsonError(res, error_status_check.setInternalMessage(err), start)
 		return
 	}
 	log.Println(QUERY_API_PREFIX, fmt.Sprintf("GetStatus: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
-	res.WriteHeader(http.StatusOK)
 	res.Write([]byte("OK"))
 }
 
@@ -178,32 +195,27 @@ func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars
 
 		userId := vars["userID"]
 
-		groupId, err := a.getUserPairId(userId, a.getToken(req))
-		if err != nil {
-			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: failed after [%.5f] secs with error[%s]", time.Now().Sub(start).Seconds(), err.Error()))
-			http.Error(res, err.Error(), http.StatusBadRequest)
+		group := a.SeagullClient.GetPrivatePair(userId, "uploads", a.ShorelineClient.TokenProvide())
+
+		if group == nil {
+			jsonError(res, error_getting_permissons, start)
 			return
 		}
-		if a.userCanViewData(userId, groupId) {
-			timeLastEntry, err := a.Store.GetTimeLastEntryUser(groupId)
+		if a.userCanViewData(userId, group.ID) {
+			timeLastEntry, err := a.Store.GetTimeLastEntryUser(group.ID)
 			if err != nil {
-				log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-				log.Println(QUERY_API_PREFIX, "TimeLastEntryUser:", error_running_query, err.Error())
-				http.Error(res, error_running_query, http.StatusInternalServerError)
+				jsonError(res, error_running_query.setInternalMessage(err), start)
 				return
 			}
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 			res.Header().Set("content-type", "application/json")
-			res.WriteHeader(http.StatusOK)
 			res.Write(timeLastEntry)
 			return
 		}
-		log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: failed after [%.5f] secs with error[%s]", time.Now().Sub(start).Seconds(), error_no_permissons))
-		http.Error(res, error_no_permissons, http.StatusForbidden)
+		jsonError(res, error_no_view_permisson, start)
 		return
 	}
-	log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUser: failed authorization after [%.5f] secs", time.Now().Sub(start).Seconds()))
-	http.Error(res, "failed authorization", http.StatusUnauthorized)
+	jsonError(res, error_not_authorized, start)
 	return
 }
 
@@ -217,35 +229,67 @@ func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Requ
 
 	if a.authorized(req) {
 		userId := vars["userID"]
-		groupId, err := a.getUserPairId(userId, a.getToken(req))
-		if err != nil {
-			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: failed after [%.5f] secs with error[%s]", time.Now().Sub(start).Seconds(), err.Error()))
-			http.Error(res, err.Error(), http.StatusBadRequest)
+
+		group := a.SeagullClient.GetPrivatePair(userId, "uploads", a.ShorelineClient.TokenProvide())
+
+		if group == nil {
+			jsonError(res, error_getting_permissons, start)
 			return
 		}
-		if a.userCanViewData(userId, groupId) {
-			timeLastEntry, err := a.Store.GetTimeLastEntryUserAndDevice(groupId, vars["deviceID"])
+		if a.userCanViewData(userId, group.ID) {
+			timeLastEntry, err := a.Store.GetTimeLastEntryUserAndDevice(group.ID, vars["deviceID"])
 			if err != nil {
-				log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-				log.Println(QUERY_API_PREFIX, "TimeLastEntryUserAndDevice:", error_running_query, err.Error())
-				http.Error(res, error_running_query, http.StatusInternalServerError)
+				jsonError(res, error_running_query.setInternalMessage(err), start)
 				return
 			}
-
 			log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 			res.Header().Set("content-type", "application/json")
-			res.WriteHeader(http.StatusOK)
 			res.Write(timeLastEntry)
 			return
 		}
-		log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: failed after [%.5f] secs with error[%s]", time.Now().Sub(start).Seconds(), error_no_permissons))
-		http.Error(res, error_no_permissons, http.StatusForbidden)
+		jsonError(res, error_no_view_permisson, start)
 		return
 	}
-	log.Println(QUERY_API_PREFIX, fmt.Sprintf("TimeLastEntryUserAndDevice: failed authorization after [%.5f] secs", time.Now().Sub(start).Seconds()))
-	http.Error(res, "failed authorization", http.StatusUnauthorized)
+	jsonError(res, error_not_authorized, start)
 	return
+}
 
+//build up valid QueryData from the request or return any detailedError that happens while trying to build it
+func buildQueryFrom(req *http.Request) (*model.QueryData, *detailedError) {
+	defer req.Body.Close()
+	rawQuery, err := ioutil.ReadAll(req.Body)
+
+	if err != nil {
+		return nil, error_internal_server.setInternalMessage(err)
+	}
+	query := string(rawQuery)
+	if query == "" {
+		return nil, error_building_query
+	}
+
+	log.Println(QUERY_API_PREFIX, "Query: raw ", query)
+
+	errs, qd := model.BuildQuery(query)
+
+	if len(errs) != 0 {
+		buildError := error_building_query
+		buildError.Message = fmt.Sprintf("[%s] %v", buildError.Message, errs)
+		return nil, buildError
+	}
+	return qd, nil
+}
+
+//as `userid` from our query could infact be an email we need to resolve that and then get the associated groupId or return any detailedError
+func (a *Api) getGroupForQueriedUser(req *http.Request, givenId string) (string, *detailedError) {
+	resolvedUser, err := a.ShorelineClient.GetUser(givenId, a.getToken(req))
+	if err != nil {
+		return "", error_no_userid.setInternalMessage(err)
+	}
+	group := a.SeagullClient.GetPrivatePair(resolvedUser.UserID, "uploads", a.ShorelineClient.TokenProvide())
+	if group == nil {
+		return "", error_getting_permissons
+	}
+	return group.ID, nil
 }
 
 // http.StatusOK - the requested data
@@ -259,54 +303,36 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 		log.Println(QUERY_API_PREFIX, "Query: starting ... ")
 
-		defer req.Body.Close()
-		rawQuery, err := ioutil.ReadAll(req.Body)
+		//build the query
+		qd, detailedErr := buildQueryFrom(req)
 
-		if err != nil || string(rawQuery) == "" {
-			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: err decoding nonempty response body: [%v]\n [%v]\n", err, req.Body))
-			http.Error(res, error_building_query, http.StatusBadRequest)
-			return
-		}
-		query := string(rawQuery)
-
-		log.Println(QUERY_API_PREFIX, "Query: raw ", query)
-
-		errs, qd := model.BuildQuery(query)
-
-		if len(errs) != 0 {
-			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: errors [%v] found parsing raw query [%s]", errs, query))
-			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-			http.Error(res, fmt.Sprintf("Errors building query: [%v]", errs), http.StatusBadRequest)
-			return
+		if detailedErr != nil {
+			jsonError(res, detailedErr, start)
 		}
 
-		pairId, err := a.getUserPairId(qd.GetMetaQueryId(), a.getToken(req))
-
-		if err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
-			return
+		//find the groupId
+		groupId, detailedErr := a.getGroupForQueriedUser(req, qd.GetMetaQueryId())
+		if detailedErr != nil {
+			jsonError(res, detailedErr, start)
 		}
 
-		qd.SetMetaQueryId(pairId)
+		qd.SetMetaQueryId(groupId)
 
+		//run the query
 		result, err := a.Store.ExecuteQuery(qd)
 
 		if err != nil {
-			log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: failed after [%.5f] secs", time.Now().Sub(start).Seconds()))
-			log.Println(QUERY_API_PREFIX, "Query:", error_running_query, err.Error())
-			http.Error(res, error_running_query, http.StatusInternalServerError)
+			jsonError(res, error_running_query.setInternalMessage(err), start)
 			return
 		}
 		// yay we made it! lets give them what they asked for
 		log.Println(QUERY_API_PREFIX, fmt.Sprintf("Query: completed in [%.5f] secs", time.Now().Sub(start).Seconds()))
 		res.Header().Set("content-type", "application/json")
-		res.WriteHeader(http.StatusOK)
 		res.Write(result)
 		return
 
 	}
-	log.Print(QUERY_API_PREFIX, "Query: failed authorization")
-	http.Error(res, "failed authorization", http.StatusUnauthorized)
+	jsonError(res, error_not_authorized, start)
 	return
 }
 
