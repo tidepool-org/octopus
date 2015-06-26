@@ -85,11 +85,9 @@ func (d MongoStoreClient) Ping() error {
 
 func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 	var result map[string]interface{}
-
-	sessionCopy := d.session
-	defer sessionCopy.Close()
-
 	startQueryTime := time.Now()
+	sessionCopy := d.session.Copy()
+	defer sessionCopy.Close()
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(getBaseQuery(groupId)).
@@ -112,7 +110,7 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	var result map[string]interface{}
 
 	startQueryTime := time.Now()
-	sessionCopy := d.session
+	sessionCopy := d.session.Copy()
 	defer sessionCopy.Close()
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
@@ -201,7 +199,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 	filter := bson.M{"_id": 0, "_active": 0}
 
 	startQueryTime := time.Now()
-	sessionCopy := d.session
+	sessionCopy := d.session.Copy()
 	defer sessionCopy.Close()
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
