@@ -24,32 +24,41 @@ import (
 )
 
 type MockStoreClient struct {
-	salt            string
-	doBad           bool
-	returnDifferent bool
+	salt        string
+	ThrowError  bool
+	ReturnOther bool
 }
 
 func NewMockStoreClient(salt string, returnDifferent, doBad bool) *MockStoreClient {
-	return &MockStoreClient{salt: salt, doBad: doBad, returnDifferent: returnDifferent}
+	return &MockStoreClient{salt: salt, ThrowError: doBad, ReturnOther: returnDifferent}
 }
 
 func (d MockStoreClient) Close() {}
 
 func (d MockStoreClient) Ping() error {
-	if d.doBad {
+	if d.ThrowError {
 		return errors.New("Session failure")
 	}
 	return nil
 }
 
-func (d MockStoreClient) GetTimeLastEntryUser(deviceId string) []byte {
-	return []byte("GetTimeLastEntryUser")
+func (d MockStoreClient) GetTimeLastEntryUser(deviceId string) ([]byte, error) {
+	if d.ThrowError {
+		return nil, errors.New("GetTimeLastEntryUser mongo error")
+	}
+	return []byte("GetTimeLastEntryUser"), nil
 }
 
-func (d MockStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) []byte {
-	return []byte("GetTimeLastEntryUserDevice")
+func (d MockStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string) ([]byte, error) {
+	if d.ThrowError {
+		return nil, errors.New("GetTimeLastEntryUserAndDevice mongo error")
+	}
+	return []byte("GetTimeLastEntryUserDevice"), nil
 }
 
 func (d MockStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error) {
+	if d.ThrowError {
+		return nil, errors.New("ExecuteQuery mongo error")
+	}
 	return []byte("ExecuteQuery"), nil
 }

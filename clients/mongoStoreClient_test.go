@@ -18,8 +18,10 @@ not, you can obtain one from Tidepool Project at tidepool.org.
 package clients
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -43,41 +45,54 @@ var (
 	testingConfig = &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 )
 
-func TestMongoStore(t *testing.T) {
+const (
+	valid_groupid  = "1234"
+	valid_deviceid = "Paradigm Revel - 723-=-53571999" // there is only one match
+)
 
-	mc := NewMongoStoreClient(testingConfig)
+func initTestData() *MongoStoreClient {
 
-	/*
-	 * INIT THE TEST - we use a clean copy of the collection before we start
-	 */
-
-	mc.deviceDataC.DropCollection()
-
-	if err := mc.deviceDataC.Create(&mgo.CollectionInfo{}); err != nil {
-		t.Fatalf("We couldn't create the device data collection for these tests ", err)
+	mongoSession, err := mongo.Connect(testingConfig)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	/*
-	 * Load test data
-	 */
+	setupCopy := mongoSession.Copy()
+	defer setupCopy.Close()
+
+	//remove existing and start fresh
+	setupCopy.DB("").C(DEVICE_DATA_COLLECTION).DropCollection()
+
+	if err := setupCopy.DB("").C(DEVICE_DATA_COLLECTION).Create(&mgo.CollectionInfo{}); err != nil {
+		log.Panic("We could not load the test data ", err.Error())
+	}
+
+	//initialize the test data
 	if testData, err := ioutil.ReadFile("./test_data.json"); err == nil {
 
 		var toLoad []interface{}
 
 		if err := json.Unmarshal(testData, &toLoad); err != nil {
-			t.Fatalf("We could not load the test data ", err)
+			log.Panic("We could not load the test data ", err.Error())
 		}
 
 		for i := range toLoad {
 			//insert each test data item
-			if insertErr := mc.deviceDataC.Insert(toLoad[i]); insertErr != nil {
-				t.Fatalf("We could not load the test data ", insertErr)
+			if insertErr := setupCopy.DB("").C(DEVICE_DATA_COLLECTION).Insert(toLoad[i]); insertErr != nil {
+				log.Panic("We could not load the test data ", err.Error())
 			}
 		}
 	}
-	/*
-	 * Load test data
-	 */
+
+	//return an instance of the store
+	return NewMongoStoreClient(testingConfig)
+
+}
+
+func TestMongoStore(t *testing.T) {
+
+	mc := initTestData()
+
 	if results, err := mc.ExecuteQuery(basalsQd); err != nil {
 		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
 	} else if results == nil {
@@ -153,10 +168,13 @@ func TestIndexes(t *testing.T) {
 		std_query_idx      = "_groupId_1__active_1_type_1_time_-1"
 		uploadid_query_idx = "_groupId_1__active_1_type_1_uploadId_1_time_-1"
 	)
-	mc := NewMongoStoreClient(testingConfig)
+	mc := initTestData()
 
-	if idxs, err := mc.deviceDataC.Indexes(); err != nil {
-		t.Fatalf("TestIndexes unexpected error ", err.Error())
+	sCopy := mc.session
+	defer sCopy.Close()
+
+	if idxs, err := sCopy.DB("").C(DEVICE_DATA_COLLECTION).Indexes(); err != nil {
+		t.Fatal("TestIndexes unexpected error ", err.Error())
 	} else {
 		// there are the two we have added and also the standard index
 		if len(idxs) != 3 {
@@ -171,10 +189,57 @@ func TestIndexes(t *testing.T) {
 			t.Fatalf("TestIndexes expected [%s] got [%s] ", uploadid_query_idx, idxs[1].Name)
 		}
 	}
+}
+
+func TestGetTimeLastEntryUser(t *testing.T) {
+
+	mc := initTestData()
+
+	entry, err := mc.GetTimeLastEntryUser(valid_groupid)
+
+	t.Logf("TestGetTimeLastEntryUser %s ", entry)
+
+	if len(entry) <= 0 {
+		t.Fatal("GetTimeLastEntryUserAndDevice time entry hsould be set")
+	}
+
+	expectedTime := []byte("2015-01-13T08:44:04.000Z")
+
+	if bytes.Equal(expectedTime, entry) && reflect.DeepEqual(expectedTime, entry) {
+		t.Fatalf("GetTimeLastEntryUser expected [%s] got [%s] ", expectedTime, entry)
+	}
+
+	if err != nil {
+		t.Fatalf("GetTimeLastEntryUser unexpected error [%s]", err.Error())
+	}
 
 }
 
-func TestWhereQueryConstruction(t *testing.T) {
+func TestGetTimeLastEntryUserAndDevice(t *testing.T) {
+
+	mc := initTestData()
+
+	entry, err := mc.GetTimeLastEntryUserAndDevice(valid_groupid, valid_deviceid)
+
+	t.Logf("TestGetTimeLastEntryUserAndDevice %s ", entry)
+
+	if len(entry) <= 0 {
+		t.Fatal("GetTimeLastEntryUserAndDevice time entry hsould be set")
+	}
+
+	expectedTime := []byte("2014-10-28T10:00:00.000Z")
+
+	if bytes.Equal(expectedTime, entry) && reflect.DeepEqual(expectedTime, entry) {
+		t.Fatalf("GetTimeLastEntryUserAndDevice expected [%s] got [%s] ", expectedTime, entry)
+	}
+
+	if err != nil {
+		t.Fatalf("GetTimeLastEntryUserAndDevice unexpected error [%s]", err.Error())
+	}
+
+}
+
+func Test_constructQuery_WhereQueryConstruction(t *testing.T) {
 
 	ourData := &model.QueryData{
 		MetaQuery:       map[string]string{"userid": "1234"},

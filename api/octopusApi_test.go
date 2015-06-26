@@ -20,13 +20,11 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 
-	"github.com/gorilla/mux"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
 
@@ -34,232 +32,268 @@ import (
 )
 
 const (
-	FAKE_TOKEN             = "yolo"
-	FAKE_GROUP_ID          = "abcdefg"
-	FAKE_VALUE             = "gfedcba"
-	FAKE_USER_ID           = "oldgreg"
-	FAKE_USER_ID_DIFFERENT = "different"
-	SOME_SALT              = "salty"
+
+	//valid
+	valid_token    = "yolo"
+	valid_groupid  = "abcdefg"
+	valid_userid   = "oldgreg"
+	valid_deviceid = "some-supported-device"
+
+	//invalid
+	invalid_token         = "token-invalid"
+	userid_no_match_found = "user-no-match"
+
+	//specified permissons only
+	token_can_only_upload  = "token-upload-only"
+	userid_can_only_upload = "user-upload-only"
+
+	SOME_SALT = "salty"
 )
 
 type (
-
-	//common test structure
-	toTest struct {
-		skip       bool
-		returnNone bool
-		method     string
-		url        string
-		body       string
-		token      string
-		respCode   int
-		response   jo
-	}
-	// These two types make it easier to define blobs of json inline.
-	// We don't use the types defined by the API because we want to
-	// be able to test with partial data structures.
-	// jo is a generic json object
-	jo map[string]interface{}
-
-	// and ja is a generic json array
-	ja []interface{}
-
-	MockShorelineClient struct {
-		validToken bool
-		token      shoreline.TokenData
-	}
+	MockShorelineClient struct{}
 
 	MockSeagullClient struct{}
 
 	MockGateKeeperClient struct{}
 )
 
-func (i *jo) deepCompare(j *jo) string {
-	for k, _ := range *i {
-		if reflect.DeepEqual((*i)[k], (*j)[k]) == false {
-			return fmt.Sprintf("for [%s] was [%v] expected [%v] ", k, (*i)[k], (*j)[k])
-		}
-	}
-	return ""
-}
-
 func (slc MockShorelineClient) CheckToken(token string) *shoreline.TokenData {
-	if slc.validToken {
-		return &slc.token
-	} else {
+	if token == invalid_token {
+		log.Print("MockShorelineClient.CheckToken ", "return nil as you gave the token", invalid_token)
 		return nil
+	} else if token == token_can_only_upload {
+		return &shoreline.TokenData{UserID: userid_can_only_upload, IsServer: false}
 	}
+	return &shoreline.TokenData{UserID: valid_userid, IsServer: false}
 }
 
 func (slc MockShorelineClient) TokenProvide() string {
-	return FAKE_TOKEN
+	log.Print("MockShorelineClient.TokenProvide", "return a valid token")
+	return valid_token
 }
 
 func (slc MockShorelineClient) GetUser(userID, token string) (*shoreline.UserData, error) {
+	log.Print("MockShorelineClient.GetUser", "return the user asked for")
 	return &shoreline.UserData{UserID: userID, UserName: userID, Emails: []string{userID}}, nil
 }
 
 func (sgc MockSeagullClient) GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair {
-	return &commonClients.PrivatePair{FAKE_GROUP_ID, FAKE_VALUE}
+	if userID == userid_no_match_found {
+		log.Println("MockSeagullClient.GetPrivatePair", "no private pair found")
+		return nil
+	}
+	return &commonClients.PrivatePair{ID: hashName, Value: "value-to-use"}
 }
 
 func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error) {
-	return nil, nil
-}
+	permissonsToReturn := make(map[string]commonClients.Permissions)
+	p := make(commonClients.Permissions)
 
-var (
-	mockConfig = Config{
-		ServerSecret: "shhh! don't tell",
-	}
-	vars                        = httpVars{"userID": FAKE_USER_ID}
-	varsDifferent               = httpVars{"userID": FAKE_USER_ID_DIFFERENT}
-	tokenIsServer               = shoreline.TokenData{FAKE_USER_ID, true}
-	tokenIsNotServer            = shoreline.TokenData{FAKE_USER_ID, false}
-	mockShoreline               = MockShorelineClient{true, tokenIsServer}
-	mockShorelineNilToken       = MockShorelineClient{false, tokenIsServer}
-	mockShorelineTokenNotServer = MockShorelineClient{true, tokenIsNotServer}
-	mockSeagullClient           = MockSeagullClient{}
-	mockeGatekeeperClient       = MockGateKeeperClient{}
-	mockStore                   = clients.NewMockStoreClient(SOME_SALT, false, false)
-	mockStoreEmpty              = clients.NewMockStoreClient(SOME_SALT, true, false)
-	mockStoreFailure            = clients.NewMockStoreClient(SOME_SALT, false, true)
-	rtr                         = mux.NewRouter()
-	octopus                     = InitApi(mockConfig, mockShoreline, mockSeagullClient, mockeGatekeeperClient, mockStore)
-	octopusNilToken             = InitApi(mockConfig, mockShorelineNilToken, mockSeagullClient, mockeGatekeeperClient, mockStore)
-	octopusFail                 = InitApi(mockConfig, mockShoreline, mockSeagullClient, mockeGatekeeperClient, mockStoreFailure)
-	octopusTokenNotServer       = InitApi(mockConfig, mockShorelineTokenNotServer, mockSeagullClient, mockeGatekeeperClient, mockStore)
-)
+	log.Printf("user [%s] group [%s]", userID, groupID)
 
-func genReqRes() (request *http.Request, response *httptest.ResponseRecorder) {
-	request, _ = http.NewRequest("GET", "/", nil)
-	response = httptest.NewRecorder()
-	return
-}
-
-func TestOctopusResponds(t *testing.T) {
-
-	tests := []toTest{
-		{
-			// always returns a 200 if properly formed
-			method:   "GET",
-			url:      "/status",
-			respCode: http.StatusOK,
-		},
-		{
-			// always returns a 200 if properly formed
-			method:   "GET",
-			url:      "/upload/lastentry/" + FAKE_USER_ID,
-			token:    FAKE_TOKEN,
-			respCode: http.StatusOK,
-		},
-
-		{
-			// always returns a 200 if properly formed
-			method:   "GET",
-			url:      "/upload/lastentry/" + FAKE_USER_ID + "/123-my-device-id",
-			respCode: http.StatusOK,
-			token:    FAKE_TOKEN,
-		},
+	if userID == userid_can_only_upload {
+		log.Println("MockGateKeeperClient.UserInGroup", "Allow `upload` perms only")
+		p["userid"] = userID
+		permissonsToReturn["upload"] = p
+		return permissonsToReturn, nil
 	}
 
-	for idx, test := range tests {
-
-		//fresh each time
-		var testRtr = mux.NewRouter()
-
-		if test.returnNone {
-			octopusFindsNothing := InitApi(mockConfig, mockShoreline, mockSeagullClient, mockeGatekeeperClient, mockStoreEmpty)
-			octopusFindsNothing.SetHandlers("", testRtr)
-		} else {
-			octopus := InitApi(mockConfig, mockShoreline, mockSeagullClient, mockeGatekeeperClient, mockStore)
-			octopus.SetHandlers("", testRtr)
-		}
-
-		var body = &bytes.Buffer{}
-		// build the body only if there is one defined in the test
-		if len(test.body) != 0 {
-			json.NewEncoder(body).Encode(test.body)
-		}
-		request, _ := http.NewRequest(test.method, test.url, body)
-		if test.token != "" {
-			request.Header.Set(SESSION_TOKEN, FAKE_TOKEN)
-		}
-		response := httptest.NewRecorder()
-		testRtr.ServeHTTP(response, request)
-
-		if response.Code != test.respCode {
-			t.Fatalf("Test %d url: '%s'\nNon-expected status code %d (expected %d):\n\tbody: %v",
-				idx, test.url, response.Code, test.respCode, response.Body)
-		}
-
-		if response.Body.Len() != 0 && len(test.response) != 0 {
-			// compare bodies by comparing the unmarshalled JSON results
-			var result = &jo{}
-
-			if err := json.NewDecoder(response.Body).Decode(result); err != nil {
-				t.Logf("Err decoding nonempty response body: [%v]\n [%v]\n", err, response.Body)
-				return
-			}
-
-			if cmp := result.deepCompare(&test.response); cmp != "" {
-				t.Fatalf("Test %d url: '%s'\n\t%s\n", idx, test.url, cmp)
-			}
-		}
-	}
+	log.Println("MockGateKeeperClient.UserInGroup", "Allow `view` perms only")
+	p["userid"] = userID
+	permissonsToReturn["view"] = p
+	return permissonsToReturn, nil
 }
 
-func TestGetStatus_StatusOk(t *testing.T) {
-	req, res := genReqRes()
-	octopus.GetStatus(res, req)
+// initialize the api in a working state:
+// we may reset some clients depending on what we are trying to assert in our tests
+func initApiForTest() *Api {
+	return InitApi(
+		Config{ServerSecret: "shhh! don't tell"},
+		MockShorelineClient{},
+		MockSeagullClient{},
+		MockGateKeeperClient{},
+		clients.NewMockStoreClient(SOME_SALT, false, false),
+	)
+}
+
+func Test_GetStatus_OK(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.GetStatus(res, req)
 	if res.Code != http.StatusOK {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusOK)
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusOK)
 	}
+
 }
 
-func TestGetStatus_StatusInternalServerError(t *testing.T) {
-	req, res := genReqRes()
-	octopusFail.GetStatus(res, req)
+func Test_GetStatus_InternalServerError(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	//the store will throw an exception
+	octo.Store = clients.NewMockStoreClient(SOME_SALT, false, true)
+
+	octo.GetStatus(res, req)
 	if res.Code != http.StatusInternalServerError {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusInternalServerError)
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusInternalServerError)
 	}
 }
 
-func TestTimeLastEntryUser_Success(t *testing.T) {
-	req, res := genReqRes()
-	octopus.TimeLastEntryUser(res, req, vars)
+func Test_TimeLastEntryUser_OK(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, valid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.TimeLastEntryUser(res, req, httpVars{"userID": valid_userid})
 	if res.Code != http.StatusOK {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusOK)
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusOK)
 	}
 }
 
-func TestTimeLastEntryUser_NilToken_StatusForbidden(t *testing.T) {
-	req, res := genReqRes()
-	octopusNilToken.TimeLastEntryUser(res, req, vars)
+func Test_TimeLastEntryUser_BadRequest(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, valid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.TimeLastEntryUser(res, req, httpVars{"userID": userid_no_match_found})
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusBadRequest)
+	}
+}
+
+func Test_TimeLastEntryUser_Unauthorized(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, invalid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.TimeLastEntryUser(res, req, httpVars{"userID": valid_userid})
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusUnauthorized)
+	}
+}
+
+func Test_TimeLastEntryUser_Forbidden(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, token_can_only_upload)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.TimeLastEntryUser(res, req, httpVars{"userID": valid_userid})
 	if res.Code != http.StatusForbidden {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusForbidden)
 	}
 }
 
-func TestTimeLastEntryUser_NotAuthorized_StatusForbidden(t *testing.T) {
-	req, res := genReqRes()
-	octopusTokenNotServer.TimeLastEntryUser(res, req, varsDifferent)
-	if res.Code != http.StatusForbidden {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
-	}
-}
+func Test_TimeLastEntryUserAndDevice_OK(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, valid_token)
+	res := httptest.NewRecorder()
 
-func TestTimeLastEntryUserAndDevice_Success(t *testing.T) {
-	req, res := genReqRes()
-	octopus.TimeLastEntryUserAndDevice(res, req, vars)
+	octo := initApiForTest()
+	octo.TimeLastEntryUserAndDevice(res, req, httpVars{"userID": valid_userid, "deviceID": valid_deviceid})
 	if res.Code != http.StatusOK {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusOK)
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusOK)
 	}
 }
 
-func TestTimeLastEntryUserAndDevice_NilToken_StatusForbidden(t *testing.T) {
-	req, res := genReqRes()
-	octopusNilToken.TimeLastEntryUserAndDevice(res, req, vars)
+func Test_TimeLastEntryUserAndDevice_BadRequest(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, valid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.TimeLastEntryUserAndDevice(res, req, httpVars{"userID": userid_no_match_found, "deviceID": valid_deviceid})
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusBadRequest)
+	}
+}
+
+func Test_TimeLastEntryUserAndDevice_Unauthorized(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, invalid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.TimeLastEntryUserAndDevice(res, req, httpVars{"userID": valid_userid, "deviceID": valid_deviceid})
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusUnauthorized)
+	}
+}
+
+func Test_TimeLastEntryUserAndDevice_Forbidden(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set(SESSION_TOKEN, token_can_only_upload)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.TimeLastEntryUserAndDevice(res, req, httpVars{"userID": valid_userid, "deviceID": valid_deviceid})
 	if res.Code != http.StatusForbidden {
-		t.Fatalf("Resp given [%s] expected [%s] ", res.Code, http.StatusForbidden)
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusForbidden)
+	}
+}
+
+func encodeQuery(queryString string) *bytes.Buffer {
+	var body = &bytes.Buffer{}
+	json.NewEncoder(body).Encode(queryString)
+	return body
+}
+
+func Test_Query_Unauthorized(t *testing.T) {
+
+	//query is valid
+	body := encodeQuery("METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg, smbg SORT BY time AS Timestamp REVERSED")
+
+	req, _ := http.NewRequest("POST", "/", body)
+	req.Header.Set(SESSION_TOKEN, invalid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.Query(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusUnauthorized)
+	}
+}
+
+func Test_Query_BadRequest(t *testing.T) {
+
+	//query will be invalid
+	body := encodeQuery("METAQUERY WHERE REVERSED")
+
+	req, _ := http.NewRequest("POST", "/", body)
+	req.Header.Set(SESSION_TOKEN, valid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.Query(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusBadRequest)
+	}
+}
+
+func Test_Query_InternalServerError(t *testing.T) {
+
+	//query is valid
+	body := encodeQuery("METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg, smbg SORT BY time AS Timestamp REVERSED")
+
+	req, _ := http.NewRequest("POST", "/", body)
+	req.Header.Set(SESSION_TOKEN, valid_token)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	//set the store so it will throw an error
+	octo.Store = clients.NewMockStoreClient(SOME_SALT, false, true)
+
+	octo.Query(res, req)
+	if res.Code != http.StatusInternalServerError {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusInternalServerError)
 	}
 }
