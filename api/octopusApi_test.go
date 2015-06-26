@@ -32,16 +32,20 @@ import (
 )
 
 const (
-	valid_token   = "yolo"
-	invalid_token = "bad-token"
 
-	valid_groupid = "abcdefg"
-
-	valid_userid           = "oldgreg"
-	userid_can_only_upload = "upload-only"
-	userid_no_match_found  = "no-match"
-
+	//valid
+	valid_token    = "yolo"
+	valid_groupid  = "abcdefg"
+	valid_userid   = "oldgreg"
 	valid_deviceid = "some-supported-device"
+
+	//invalid
+	invalid_token         = "token-invalid"
+	userid_no_match_found = "user-no-match"
+
+	//specified permissons only
+	token_can_only_upload  = "token-upload-only"
+	userid_can_only_upload = "user-upload-only"
 
 	SOME_SALT = "salty"
 )
@@ -58,6 +62,8 @@ func (slc MockShorelineClient) CheckToken(token string) *shoreline.TokenData {
 	if token == invalid_token {
 		log.Print("MockShorelineClient.CheckToken ", "return nil as you gave the token", invalid_token)
 		return nil
+	} else if token == token_can_only_upload {
+		return &shoreline.TokenData{UserID: userid_can_only_upload, IsServer: false}
 	}
 	return &shoreline.TokenData{UserID: valid_userid, IsServer: false}
 }
@@ -83,6 +89,8 @@ func (sgc MockSeagullClient) GetPrivatePair(userID, hashName, token string) *com
 func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error) {
 	permissonsToReturn := make(map[string]commonClients.Permissions)
 	p := make(commonClients.Permissions)
+
+	log.Printf("user [%s] group [%s]", userID, groupID)
 
 	if userID == userid_can_only_upload {
 		log.Println("MockGateKeeperClient.UserInGroup", "Allow `upload` perms only")
@@ -174,11 +182,11 @@ func Test_TimeLastEntryUser_Unauthorized(t *testing.T) {
 
 func Test_TimeLastEntryUser_Forbidden(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/", nil)
-	req.Header.Set(SESSION_TOKEN, valid_token)
+	req.Header.Set(SESSION_TOKEN, token_can_only_upload)
 	res := httptest.NewRecorder()
 
 	octo := initApiForTest()
-	octo.TimeLastEntryUser(res, req, httpVars{"userID": userid_can_only_upload})
+	octo.TimeLastEntryUser(res, req, httpVars{"userID": valid_userid})
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusForbidden)
 	}
@@ -223,11 +231,11 @@ func Test_TimeLastEntryUserAndDevice_Unauthorized(t *testing.T) {
 
 func Test_TimeLastEntryUserAndDevice_Forbidden(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/", nil)
-	req.Header.Set(SESSION_TOKEN, valid_token)
+	req.Header.Set(SESSION_TOKEN, token_can_only_upload)
 	res := httptest.NewRecorder()
 
 	octo := initApiForTest()
-	octo.TimeLastEntryUserAndDevice(res, req, httpVars{"userID": userid_can_only_upload, "deviceID": valid_deviceid})
+	octo.TimeLastEntryUserAndDevice(res, req, httpVars{"userID": valid_userid, "deviceID": valid_deviceid})
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusForbidden)
 	}

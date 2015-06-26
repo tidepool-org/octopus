@@ -52,18 +52,18 @@ type (
 		ServerSecret string `json:"serverSecret"` //used for services
 	}
 
+	ShorelineInterface interface {
+		CheckToken(token string) *shoreline.TokenData
+		GetUser(userID, token string) (*shoreline.UserData, error)
+		TokenProvide() string
+	}
+
 	GatekeeperInterface interface {
 		UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error)
 	}
 
 	SeagullInterface interface {
 		GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair
-	}
-
-	ShorelineInterface interface {
-		CheckToken(token string) *shoreline.TokenData
-		GetUser(userID, token string) (*shoreline.UserData, error)
-		TokenProvide() string
 	}
 
 	// so we can wrap and marshal the detailed error
@@ -115,18 +115,18 @@ func jsonError(res http.ResponseWriter, err *detailedError, startedAt time.Time)
 }
 
 //find and validate the token
-func (a *Api) authorized(req *http.Request) bool {
+func (a *Api) authorized(req *http.Request) *shoreline.TokenData {
 
 	if token := a.getToken(req); token != "" {
 		if td := a.ShorelineClient.CheckToken(token); td != nil {
 			log.Println(QUERY_API_PREFIX, "token check succeeded")
-			return true
+			return td
 		}
 		log.Println(QUERY_API_PREFIX, "token check failed")
-		return false
+		return nil
 	}
 	log.Println(QUERY_API_PREFIX, "no token to check")
-	return false
+	return nil
 }
 
 func (a *Api) userCanViewData(userID, groupID string) bool {
@@ -134,6 +134,8 @@ func (a *Api) userCanViewData(userID, groupID string) bool {
 	if userID == groupID {
 		return true
 	}
+
+	log.Println("checking if user", userID, " can view group", groupID)
 
 	perms, err := a.GatekeeperClient.UserInGroup(userID, groupID)
 	if err != nil {
@@ -150,8 +152,11 @@ func (a *Api) getToken(req *http.Request) string {
 	return req.Header.Get(SESSION_TOKEN)
 }
 
-func InitApi(cfg Config, slc ShorelineInterface,
-	sgc SeagullInterface, gkc GatekeeperInterface,
+func InitApi(
+	cfg Config,
+	slc ShorelineInterface,
+	sgc SeagullInterface,
+	gkc GatekeeperInterface,
 	store clients.StoreClient) *Api {
 
 	return &Api{
@@ -193,17 +198,19 @@ func (a *Api) TimeLastEntryUser(res http.ResponseWriter, req *http.Request, vars
 
 	start := time.Now()
 
-	if a.authorized(req) {
+	if td := a.authorized(req); td != nil {
 
 		userId := vars["userID"]
 
-		group := a.SeagullClient.GetPrivatePair(userId, "uploads", a.ShorelineClient.TokenProvide())
+		if a.userCanViewData(td.UserID, userId) {
 
-		if group == nil {
-			jsonError(res, error_getting_permissons, start)
-			return
-		}
-		if a.userCanViewData(userId, group.ID) {
+			group := a.SeagullClient.GetPrivatePair(userId, "uploads", a.ShorelineClient.TokenProvide())
+
+			if group == nil {
+				jsonError(res, error_getting_permissons, start)
+				return
+			}
+
 			timeLastEntry, err := a.Store.GetTimeLastEntryUser(group.ID)
 			if err != nil {
 				jsonError(res, error_running_query.setInternalMessage(err), start)
@@ -229,16 +236,16 @@ func (a *Api) TimeLastEntryUserAndDevice(res http.ResponseWriter, req *http.Requ
 
 	start := time.Now()
 
-	if a.authorized(req) {
+	if td := a.authorized(req); td != nil {
 		userId := vars["userID"]
 
-		group := a.SeagullClient.GetPrivatePair(userId, "uploads", a.ShorelineClient.TokenProvide())
+		if a.userCanViewData(td.UserID, userId) {
+			group := a.SeagullClient.GetPrivatePair(userId, "uploads", a.ShorelineClient.TokenProvide())
 
-		if group == nil {
-			jsonError(res, error_getting_permissons, start)
-			return
-		}
-		if a.userCanViewData(userId, group.ID) {
+			if group == nil {
+				jsonError(res, error_getting_permissons, start)
+				return
+			}
 			timeLastEntry, err := a.Store.GetTimeLastEntryUserAndDevice(group.ID, vars["deviceID"])
 			if err != nil {
 				jsonError(res, error_running_query.setInternalMessage(err), start)
@@ -301,7 +308,7 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 
 	start := time.Now()
 
-	if a.authorized(req) {
+	if td := a.authorized(req); td != nil {
 
 		log.Println(QUERY_API_PREFIX, "Query: starting ... ")
 
