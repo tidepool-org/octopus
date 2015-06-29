@@ -33,21 +33,33 @@ import (
 	"../model"
 )
 
+const (
+	valid_userid = "1234"
+
+	valid_groupid  = "1234"
+	valid_deviceid = "Paradigm Revel - 723-=-53571999" // there is only one match
+
+	no_match_groupid  = "no_match"
+	no_match_userid   = "no_match"
+	no_match_deviceid = "Paradigm Revel - 723-=-77777777"
+)
+
 var (
 	theTime  = "2014-10-23T10:00:00.000Z"
 	basalsQd = &model.QueryData{
-		MetaQuery:       map[string]string{"userid": "1234"},
+		MetaQuery:       map[string]string{"userid": valid_userid},
 		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "time", Value: theTime, Condition: "<"}},
 		Types:           []string{"basal"},
 		Sort:            map[string]string{"time": "myTime"},
 		Reverse:         false,
 	}
+	noDataQd = &model.QueryData{
+		MetaQuery: map[string]string{"userid": no_match_userid},
+		Types:     []string{"no_data"},
+		Sort:      map[string]string{"time": "myTime"},
+		Reverse:   false,
+	}
 	testingConfig = &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
-)
-
-const (
-	valid_groupid  = "1234"
-	valid_deviceid = "Paradigm Revel - 723-=-53571999" // there is only one match
 )
 
 func initTestData() *MongoStoreClient {
@@ -89,7 +101,37 @@ func initTestData() *MongoStoreClient {
 
 }
 
-func TestMongoStore(t *testing.T) {
+func TestIndexes(t *testing.T) {
+
+	const (
+		//index names based on feilds used
+		std_query_idx      = "_groupId_1__active_1_type_1_time_-1"
+		uploadid_query_idx = "_groupId_1__active_1_type_1_uploadId_1_time_-1"
+	)
+	mc := initTestData()
+
+	sCopy := mc.session
+	defer sCopy.Close()
+
+	if idxs, err := sCopy.DB("").C(DEVICE_DATA_COLLECTION).Indexes(); err != nil {
+		t.Fatal("TestIndexes unexpected error ", err.Error())
+	} else {
+		// there are the two we have added and also the standard index
+		if len(idxs) != 3 {
+			t.Fatalf("TestIndexes should be 3 but found [%d] ", len(idxs))
+		}
+
+		if idxs[0].Name != std_query_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", std_query_idx, idxs[0].Name)
+		}
+
+		if idxs[1].Name != uploadid_query_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", uploadid_query_idx, idxs[1].Name)
+		}
+	}
+}
+
+func TestExecuteQuery(t *testing.T) {
 
 	mc := initTestData()
 
@@ -158,37 +200,22 @@ func TestMongoStore(t *testing.T) {
 			t.Fatalf("second rate [%d] should be 0.4", second["rate"])
 		}
 	}
-
 }
 
-func TestIndexes(t *testing.T) {
+func TestExecuteQuery_NoData(t *testing.T) {
 
-	const (
-		//index names based on feilds used
-		std_query_idx      = "_groupId_1__active_1_type_1_time_-1"
-		uploadid_query_idx = "_groupId_1__active_1_type_1_uploadId_1_time_-1"
-	)
 	mc := initTestData()
 
-	sCopy := mc.session
-	defer sCopy.Close()
-
-	if idxs, err := sCopy.DB("").C(DEVICE_DATA_COLLECTION).Indexes(); err != nil {
-		t.Fatal("TestIndexes unexpected error ", err.Error())
+	if results, err := mc.ExecuteQuery(noDataQd); err != nil {
+		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
 	} else {
-		// there are the two we have added and also the standard index
-		if len(idxs) != 3 {
-			t.Fatalf("TestIndexes should be 3 but found [%d] ", len(idxs))
-		}
+		expectedData := []byte("[]")
 
-		if idxs[0].Name != std_query_idx {
-			t.Fatalf("TestIndexes expected [%s] got [%s] ", std_query_idx, idxs[0].Name)
-		}
-
-		if idxs[1].Name != uploadid_query_idx {
-			t.Fatalf("TestIndexes expected [%s] got [%s] ", uploadid_query_idx, idxs[1].Name)
+		if reflect.DeepEqual(expectedData, results) == false {
+			t.Fatalf("ExecuteQuery expected [%s] got [%s] ", expectedData, results)
 		}
 	}
+
 }
 
 func TestGetTimeLastEntryUser(t *testing.T) {
@@ -215,6 +242,22 @@ func TestGetTimeLastEntryUser(t *testing.T) {
 
 }
 
+func TestGetTimeLastEntryUser_NoData(t *testing.T) {
+
+	mc := initTestData()
+
+	entry, err := mc.GetTimeLastEntryUser(no_match_groupid)
+
+	if len(entry) != 0 {
+		t.Fatalf("GetTimeLastEntryUser found data when there should be none [%s]", string(entry[:]))
+	}
+
+	if err != nil {
+		t.Fatalf("GetTimeLastEntryUser unexpected error [%s]", err.Error())
+	}
+
+}
+
 func TestGetTimeLastEntryUserAndDevice(t *testing.T) {
 
 	mc := initTestData()
@@ -231,6 +274,22 @@ func TestGetTimeLastEntryUserAndDevice(t *testing.T) {
 
 	if bytes.Equal(expectedTime, entry) && reflect.DeepEqual(expectedTime, entry) {
 		t.Fatalf("GetTimeLastEntryUserAndDevice expected [%s] got [%s] ", expectedTime, entry)
+	}
+
+	if err != nil {
+		t.Fatalf("GetTimeLastEntryUserAndDevice unexpected error [%s]", err.Error())
+	}
+
+}
+
+func TestGetTimeLastEntryUserAndDevice_NoData(t *testing.T) {
+
+	mc := initTestData()
+
+	entry, err := mc.GetTimeLastEntryUserAndDevice(no_match_groupid, no_match_deviceid)
+
+	if len(entry) != 0 {
+		t.Fatalf("GetTimeLastEntryUserAndDevice found data when there should be none [%s]", string(entry[:]))
 	}
 
 	if err != nil {

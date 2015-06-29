@@ -89,19 +89,21 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 	sessionCopy := d.session.Copy()
 	defer sessionCopy.Close()
 
+	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(getBaseQuery(groupId)).
 		Sort("-time").
 		One(&result)
 
-	// Get the entry with the latest time by reverse sorting and taking the first value
-	if err != nil {
+	if err != nil && err != mgo.ErrNotFound {
 		log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] secs but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
 		return nil, err
+	} else if err != nil && err == mgo.ErrNotFound {
+		log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] and found no results", time.Now().Sub(startQueryTime).Seconds()))
+		return nil, nil
 	}
 
 	log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
-
 	return json.Marshal(result["time"])
 }
 
@@ -113,18 +115,21 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	sessionCopy := d.session.Copy()
 	defer sessionCopy.Close()
 
+	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(bson.M{"$and": []bson.M{getBaseQuery(groupId), bson.M{"deviceId": deviceId}}}).
 		Sort("-time").
 		One(&result)
 
-	if err != nil {
+	if err != nil && err != mgo.ErrNotFound {
 		log.Println(fmt.Sprintf("GetTimeLastEntryUserAndDevice: mongo query took [%.5f] secs but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
 		return nil, err
+	} else if err != nil && err == mgo.ErrNotFound {
+		log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] and found no results", time.Now().Sub(startQueryTime).Seconds()))
+		return nil, nil
 	}
 
 	log.Println(fmt.Sprintf("GetTimeLastEntryUserAndDevice: mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
-
 	return json.Marshal(result["time"])
 }
 
@@ -207,18 +212,17 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 		Sort(sort).
 		Select(filter).
 		All(&results)
-	if err != nil {
+
+	if err != nil && err != mgo.ErrNotFound {
 		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
 		return nil, err
+	} else if err != nil && err == mgo.ErrNotFound || len(results) == 0 {
+		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] and found no records", time.Now().Sub(startQueryTime).Seconds()))
+		return []byte("[]"), nil
 	}
 
 	log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
-
-	if len(results) == 0 {
-		return []byte("[]"), nil
-	} else {
-		bytes, _ := json.Marshal(results)
-		return bytes, nil
-	}
+	bytes, _ := json.Marshal(results)
+	return bytes, nil
 
 }
