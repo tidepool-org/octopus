@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ const (
 
 type MongoStoreClient struct {
 	session *mgo.Session
+	logger  *log.Logger
 }
 
 //all queries will be built on top of this
@@ -66,11 +68,13 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
 
-	return &MongoStoreClient{session: mongoSession}
+	storeLogger := log.New(os.Stdout, "api/query:", log.Lshortfile)
+
+	return &MongoStoreClient{session: mongoSession, logger: storeLogger}
 }
 
 func (d MongoStoreClient) Close() {
-	log.Println("Close the session")
+	d.logger.Println("Close the session")
 	d.session.Close()
 	return
 }
@@ -81,6 +85,20 @@ func (d MongoStoreClient) Ping() error {
 		return err
 	}
 	return nil
+}
+
+func (d MongoStoreClient) interpretQueryError(err error, startedAt time.Time, returnOnNotFound []byte) ([]byte, error) {
+
+	failedAfter := time.Now().Sub(startedAt).Seconds()
+
+	if err == mgo.ErrNotFound {
+		d.logger.Println(fmt.Sprintf("mongo query took [%.5f] secs and found no results", failedAfter))
+		return returnOnNotFound, nil
+	} else {
+		d.logger.Println(fmt.Sprintf("mongo query took [%.5f] secs but failed with error [%s] ", failedAfter, err.Error()))
+		return nil, err
+	}
+
 }
 
 func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
@@ -95,15 +113,11 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 		Sort("-time").
 		One(&result)
 
-	if err != nil && err != mgo.ErrNotFound {
-		log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] secs but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
-		return nil, err
-	} else if err != nil && err == mgo.ErrNotFound {
-		log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] and found no results", time.Now().Sub(startQueryTime).Seconds()))
-		return nil, nil
+	if err != nil {
+		return d.interpretQueryError(err, startQueryTime, []byte(""))
 	}
 
-	log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
+	d.logger.Println(fmt.Sprintf("mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
 	return json.Marshal(result["time"])
 }
 
@@ -121,15 +135,11 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 		Sort("-time").
 		One(&result)
 
-	if err != nil && err != mgo.ErrNotFound {
-		log.Println(fmt.Sprintf("GetTimeLastEntryUserAndDevice: mongo query took [%.5f] secs but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
-		return nil, err
-	} else if err != nil && err == mgo.ErrNotFound {
-		log.Println(fmt.Sprintf("GetTimeLastEntryUser: mongo query took [%.5f] and found no results", time.Now().Sub(startQueryTime).Seconds()))
-		return nil, nil
+	if err != nil {
+		return d.interpretQueryError(err, startQueryTime, []byte(""))
 	}
 
-	log.Println(fmt.Sprintf("GetTimeLastEntryUserAndDevice: mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
+	d.logger.Println(fmt.Sprintf("mongo query took [%.5f] secs ", time.Now().Sub(startQueryTime).Seconds()))
 	return json.Marshal(result["time"])
 }
 
@@ -149,7 +159,7 @@ func getMongoOperator(op string) string {
 	}
 }
 
-func constructQuery(details *model.QueryData) (query bson.M, sort string) {
+func (d MongoStoreClient) constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	for _, v := range details.MetaQuery {
 		//start with the base query
 		query = getBaseQuery(v)
@@ -179,7 +189,7 @@ func constructQuery(details *model.QueryData) (query bson.M, sort string) {
 				query[first.Name] = bson.M{op1: first.Value, op2: second.Value}
 			}
 		}
-		log.Printf("constructQuery: mongo query %#v", query)
+		d.logger.Printf("mongo query %#v", query)
 	}
 	//sort field and order
 	for k := range details.Sort {
@@ -196,8 +206,8 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	startTime := time.Now()
 
-	query, sort := constructQuery(details)
-	log.Println(fmt.Sprintf("ExecuteQuery: mongo query built in [%.5f] secs", time.Now().Sub(startTime).Seconds()))
+	query, sort := d.constructQuery(details)
+	d.logger.Println(fmt.Sprintf("mongo query built in [%.5f] secs", time.Now().Sub(startTime).Seconds()))
 
 	var results []interface{}
 	//we don't want to return these
@@ -213,16 +223,14 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 		Select(filter).
 		All(&results)
 
-	if err != nil && err != mgo.ErrNotFound {
-		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] but failed with error [%s] ", time.Now().Sub(startQueryTime).Seconds(), err.Error()))
-		return nil, err
-	} else if err != nil && err == mgo.ErrNotFound || len(results) == 0 {
-		log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] and found no records", time.Now().Sub(startQueryTime).Seconds()))
+	if err != nil {
+		return d.interpretQueryError(err, startQueryTime, []byte("[]"))
+	}
+	d.logger.Println(fmt.Sprintf("mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
+
+	if len(results) == 0 {
 		return []byte("[]"), nil
 	}
-
-	log.Println(fmt.Sprintf("ExecuteQuery: mongo query took [%.5f] secs and returned [%d] records", time.Now().Sub(startQueryTime).Seconds(), len(results)))
-	bytes, _ := json.Marshal(results)
-	return bytes, nil
+	return json.Marshal(results)
 
 }

@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -62,11 +61,11 @@ var (
 	testingConfig = &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 )
 
-func initTestData() *MongoStoreClient {
+func initTestData(t *testing.T) *MongoStoreClient {
 
 	mongoSession, err := mongo.Connect(testingConfig)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	setupCopy := mongoSession.Copy()
@@ -76,7 +75,7 @@ func initTestData() *MongoStoreClient {
 	setupCopy.DB("").C(DEVICE_DATA_COLLECTION).DropCollection()
 
 	if err := setupCopy.DB("").C(DEVICE_DATA_COLLECTION).Create(&mgo.CollectionInfo{}); err != nil {
-		log.Panic("We could not load the test data ", err.Error())
+		t.Fatal("We could not load the test data ", err.Error())
 	}
 
 	//initialize the test data
@@ -85,13 +84,13 @@ func initTestData() *MongoStoreClient {
 		var toLoad []interface{}
 
 		if err := json.Unmarshal(testData, &toLoad); err != nil {
-			log.Panic("We could not load the test data ", err.Error())
+			t.Fatal("We could not load the test data ", err.Error())
 		}
 
 		for i := range toLoad {
 			//insert each test data item
 			if insertErr := setupCopy.DB("").C(DEVICE_DATA_COLLECTION).Insert(toLoad[i]); insertErr != nil {
-				log.Panic("We could not load the test data ", err.Error())
+				t.Fatal("We could not load the test data ", err.Error())
 			}
 		}
 	}
@@ -108,7 +107,7 @@ func TestIndexes(t *testing.T) {
 		std_query_idx      = "_groupId_1__active_1_type_1_time_-1"
 		uploadid_query_idx = "_groupId_1__active_1_type_1_uploadId_1_time_-1"
 	)
-	mc := initTestData()
+	mc := initTestData(t)
 
 	sCopy := mc.session
 	defer sCopy.Close()
@@ -133,7 +132,7 @@ func TestIndexes(t *testing.T) {
 
 func TestExecuteQuery(t *testing.T) {
 
-	mc := initTestData()
+	mc := initTestData(t)
 
 	if results, err := mc.ExecuteQuery(basalsQd); err != nil {
 		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
@@ -204,7 +203,7 @@ func TestExecuteQuery(t *testing.T) {
 
 func TestExecuteQuery_NoData(t *testing.T) {
 
-	mc := initTestData()
+	mc := initTestData(t)
 
 	if results, err := mc.ExecuteQuery(noDataQd); err != nil {
 		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
@@ -220,11 +219,9 @@ func TestExecuteQuery_NoData(t *testing.T) {
 
 func TestGetTimeLastEntryUser(t *testing.T) {
 
-	mc := initTestData()
+	mc := initTestData(t)
 
 	entry, err := mc.GetTimeLastEntryUser(valid_groupid)
-
-	t.Logf("TestGetTimeLastEntryUser %s ", entry)
 
 	if len(entry) <= 0 {
 		t.Fatal("GetTimeLastEntryUserAndDevice time entry hsould be set")
@@ -244,7 +241,7 @@ func TestGetTimeLastEntryUser(t *testing.T) {
 
 func TestGetTimeLastEntryUser_NoData(t *testing.T) {
 
-	mc := initTestData()
+	mc := initTestData(t)
 
 	entry, err := mc.GetTimeLastEntryUser(no_match_groupid)
 
@@ -260,11 +257,9 @@ func TestGetTimeLastEntryUser_NoData(t *testing.T) {
 
 func TestGetTimeLastEntryUserAndDevice(t *testing.T) {
 
-	mc := initTestData()
+	mc := initTestData(t)
 
 	entry, err := mc.GetTimeLastEntryUserAndDevice(valid_groupid, valid_deviceid)
-
-	t.Logf("TestGetTimeLastEntryUserAndDevice %s ", entry)
 
 	if len(entry) <= 0 {
 		t.Fatal("GetTimeLastEntryUserAndDevice time entry hsould be set")
@@ -284,7 +279,7 @@ func TestGetTimeLastEntryUserAndDevice(t *testing.T) {
 
 func TestGetTimeLastEntryUserAndDevice_NoData(t *testing.T) {
 
-	mc := initTestData()
+	mc := initTestData(t)
 
 	entry, err := mc.GetTimeLastEntryUserAndDevice(no_match_groupid, no_match_deviceid)
 
@@ -309,7 +304,9 @@ func Test_constructQuery_WhereQueryConstruction(t *testing.T) {
 		Reverse:         false,
 	}
 
-	query, sort := constructQuery(ourData)
+	store := NewMongoStoreClient(testingConfig)
+
+	query, sort := store.constructQuery(ourData)
 
 	if sort != "time" {
 		t.Fatalf("sort returned [%s] but should be time", sort)
@@ -351,7 +348,9 @@ func TestInQueryConstruction(t *testing.T) {
 		Reverse:         false,
 	}
 
-	query, sort := constructQuery(ourData)
+	store := NewMongoStoreClient(testingConfig)
+
+	query, sort := store.constructQuery(ourData)
 
 	if sort != "time" {
 		t.Fatalf("sort returned [%s] but should be time", sort)
