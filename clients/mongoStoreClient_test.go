@@ -41,6 +41,8 @@ const (
 	no_match_groupid  = "no_match"
 	no_match_userid   = "no_match"
 	no_match_deviceid = "Paradigm Revel - 723-=-77777777"
+
+	all_schema_versions = 0
 )
 
 var (
@@ -58,12 +60,18 @@ var (
 		Sort:      map[string]string{"time": "myTime"},
 		Reverse:   false,
 	}
-	testingConfig = &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"}
 )
 
-func initTestData(t *testing.T) *MongoStoreClient {
+func initConfig(schemaVersion int) *Config {
+	return &Config{
+		Connection:       &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"},
+		SchemaVersionGte: schemaVersion,
+	}
+}
 
-	mongoSession, err := mongo.Connect(testingConfig)
+func initTestData(t *testing.T, config *Config) *MongoStoreClient {
+
+	mongoSession, err := mongo.Connect(config.Connection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +104,7 @@ func initTestData(t *testing.T) *MongoStoreClient {
 	}
 
 	//return an instance of the store
-	return NewMongoStoreClient(testingConfig)
+	return NewMongoStoreClient(config)
 
 }
 
@@ -104,10 +112,10 @@ func TestIndexes(t *testing.T) {
 
 	const (
 		//index names based on feilds used
-		std_query_idx      = "_groupId_1__active_1_type_1_time_-1"
-		uploadid_query_idx = "_groupId_1__active_1_type_1_uploadId_1_time_-1"
+		std_query_idx      = "_groupId_1__active_1__schemaVersion_1_type_1_time_-1"
+		uploadid_query_idx = "_groupId_1__active_1__schemaVersion_1_type_1_uploadId_1_time_-1"
 	)
-	mc := initTestData(t)
+	mc := initTestData(t, initConfig(all_schema_versions))
 
 	sCopy := mc.session
 	defer sCopy.Close()
@@ -132,7 +140,7 @@ func TestIndexes(t *testing.T) {
 
 func TestExecuteQuery(t *testing.T) {
 
-	mc := initTestData(t)
+	mc := initTestData(t, initConfig(all_schema_versions))
 
 	if results, err := mc.ExecuteQuery(basalsQd); err != nil {
 		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
@@ -203,7 +211,7 @@ func TestExecuteQuery(t *testing.T) {
 
 func TestExecuteQuery_NoData(t *testing.T) {
 
-	mc := initTestData(t)
+	mc := initTestData(t, initConfig(all_schema_versions))
 
 	if results, err := mc.ExecuteQuery(noDataQd); err != nil {
 		t.Fatalf("an error was thrown for query [%v] w error [%s]", basalsQd, err.Error())
@@ -219,12 +227,12 @@ func TestExecuteQuery_NoData(t *testing.T) {
 
 func TestGetTimeLastEntryUser(t *testing.T) {
 
-	mc := initTestData(t)
+	mc := initTestData(t, initConfig(all_schema_versions))
 
 	entry, err := mc.GetTimeLastEntryUser(valid_groupid)
 
 	if len(entry) <= 0 {
-		t.Fatal("GetTimeLastEntryUserAndDevice time entry hsould be set")
+		t.Fatal("GetTimeLastEntryUserAndDevice time entry should be set")
 	}
 
 	expectedTime := []byte("2015-01-13T08:44:04.000Z")
@@ -241,7 +249,7 @@ func TestGetTimeLastEntryUser(t *testing.T) {
 
 func TestGetTimeLastEntryUser_NoData(t *testing.T) {
 
-	mc := initTestData(t)
+	mc := initTestData(t, initConfig(all_schema_versions))
 
 	entry, err := mc.GetTimeLastEntryUser(no_match_groupid)
 
@@ -257,12 +265,12 @@ func TestGetTimeLastEntryUser_NoData(t *testing.T) {
 
 func TestGetTimeLastEntryUserAndDevice(t *testing.T) {
 
-	mc := initTestData(t)
+	mc := initTestData(t, initConfig(all_schema_versions))
 
 	entry, err := mc.GetTimeLastEntryUserAndDevice(valid_groupid, valid_deviceid)
 
 	if len(entry) <= 0 {
-		t.Fatal("GetTimeLastEntryUserAndDevice time entry hsould be set")
+		t.Fatal("GetTimeLastEntryUserAndDevice time entry should be set")
 	}
 
 	expectedTime := []byte("2014-10-28T10:00:00.000Z")
@@ -279,7 +287,7 @@ func TestGetTimeLastEntryUserAndDevice(t *testing.T) {
 
 func TestGetTimeLastEntryUserAndDevice_NoData(t *testing.T) {
 
-	mc := initTestData(t)
+	mc := initTestData(t, initConfig(all_schema_versions))
 
 	entry, err := mc.GetTimeLastEntryUserAndDevice(no_match_groupid, no_match_deviceid)
 
@@ -289,6 +297,51 @@ func TestGetTimeLastEntryUserAndDevice_NoData(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("GetTimeLastEntryUserAndDevice unexpected error [%s]", err.Error())
+	}
+}
+
+func TestSpecifiedSchemaVersion(t *testing.T) {
+
+	allBasals := &model.QueryData{
+		MetaQuery: map[string]string{"userid": valid_userid},
+		Types:     []string{"basal"},
+		Sort:      map[string]string{"time": "myTime"},
+	}
+
+	type found map[string]interface{}
+
+	//default is all data greater or equal to version 0 matters
+	mc0 := initTestData(t, initConfig(all_schema_versions))
+
+	resultsV0, _ := mc0.ExecuteQuery(allBasals)
+
+	basalsV0 := []found{}
+	json.Unmarshal(resultsV0, &basalsV0)
+
+	if len(basalsV0) != 12 {
+		t.Fatalf("We should have 12 entries for _schemaVersion >= [%d] but got [%d]", mc0.config.SchemaVersionGte, len(basalsV0))
+	}
+
+	//default is all data greater or equal to version 99 matters
+	mc99 := initTestData(t, initConfig(99))
+	resultsV99, _ := mc99.ExecuteQuery(allBasals)
+
+	basalsV99 := []found{}
+	json.Unmarshal(resultsV99, &basalsV99)
+
+	if len(basalsV99) != 4 {
+		t.Fatalf("We should have 4 entries for _schemaVersion >= [%d] but got [%d]", mc99.config.SchemaVersionGte, len(basalsV99))
+	}
+
+	//now only data greater or equal to version 101 matters
+	mc101 := initTestData(t, initConfig(101))
+	resultsV101, _ := mc101.ExecuteQuery(allBasals)
+
+	basalsV101 := []found{}
+	json.Unmarshal(resultsV101, &basalsV101)
+
+	if len(basalsV101) != 0 {
+		t.Fatalf("We should have 4 entries for _schemaVersion >= [%d] but got [%d]", mc101.config.SchemaVersionGte, len(basalsV101))
 	}
 
 }
@@ -304,7 +357,7 @@ func Test_constructQuery_WhereQueryConstruction(t *testing.T) {
 		Reverse:         false,
 	}
 
-	store := NewMongoStoreClient(testingConfig)
+	store := NewMongoStoreClient(initConfig(all_schema_versions))
 
 	query, sort := store.constructQuery(ourData)
 
@@ -348,7 +401,7 @@ func TestInQueryConstruction(t *testing.T) {
 		Reverse:         false,
 	}
 
-	store := NewMongoStoreClient(testingConfig)
+	store := NewMongoStoreClient(initConfig(all_schema_versions))
 
 	query, sort := store.constructQuery(ourData)
 

@@ -18,9 +18,15 @@ not, you can obtain one from Tidepool Project at tidepool.org.
 package main
 
 import (
+	"crypto/tls"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"./api"
 	sc "./clients"
-	"crypto/tls"
 	"github.com/gorilla/mux"
 	"github.com/tidepool-org/go-common"
 	"github.com/tidepool-org/go-common/clients"
@@ -28,19 +34,15 @@ import (
 	"github.com/tidepool-org/go-common/clients/hakken"
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"github.com/tidepool-org/go-common/clients/shoreline"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 type (
 	Config struct {
 		clients.Config
-		Service disc.ServiceListing `json:"service"`
-		Mongo   mongo.Config        `json:"mongo"`
-		Api     api.Config          `json:"octopus"`
+		Service          disc.ServiceListing `json:"service"`
+		Mongo            mongo.Config        `json:"mongo"`
+		SchemaVersionGte int                 `json:"schemaVersionGte"`
+		Api              api.Config          `json:"octopus"`
 	}
 )
 
@@ -68,7 +70,7 @@ func main() {
 	}
 	defer hakkenClient.Close()
 
-	store := sc.NewMongoStoreClient(&config.Mongo)
+	store := sc.NewMongoStoreClient(&sc.Config{Connection: &config.Mongo, SchemaVersionGte: config.SchemaVersionGte})
 
 	/*
 	 * Shoreline setup
@@ -95,8 +97,13 @@ func main() {
 		Build()
 
 	rtr := mux.NewRouter()
-	api := api.InitApi(config.Api, shorelineClient, seagullClient,
-		gatekeeperClient, store)
+	api := api.InitApi(
+		config.Api,
+		shorelineClient,
+		seagullClient,
+		gatekeeperClient,
+		store,
+	)
 	api.SetHandlers("", rtr)
 
 	/*
