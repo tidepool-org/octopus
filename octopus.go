@@ -39,7 +39,7 @@ type (
 	Config struct {
 		clients.Config
 		Service disc.ServiceListing `json:"service"`
-		Store   *sc.StoreConfig
+		sc.StoreConfig
 	}
 )
 
@@ -67,7 +67,7 @@ func main() {
 	}
 	defer hakkenClient.Close()
 
-	store := sc.NewMongoStoreClient(config.Store)
+	store := sc.NewMongoStoreClient(&config.StoreConfig)
 
 	/*
 	 * Shoreline setup
