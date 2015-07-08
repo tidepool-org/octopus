@@ -9,5 +9,8 @@
   "mongo": {
     "connectionString": "mongodb://localhost/streams"
   },
-  "schemaVersionGte": 0
+  "schemaVersion": {
+    "gte": 0,
+    "lte": 0
+  }
 }

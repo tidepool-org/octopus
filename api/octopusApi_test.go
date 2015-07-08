@@ -109,7 +109,6 @@ func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (map[string]
 // we may reset some clients depending on what we are trying to assert in our tests
 func initApiForTest() *Api {
 	return InitApi(
-		Config{ServerSecret: "shhh! don't tell"},
 		MockShorelineClient{},
 		MockSeagullClient{},
 		MockGateKeeperClient{},

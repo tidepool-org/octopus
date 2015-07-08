@@ -39,23 +39,26 @@ const (
 type MongoStoreClient struct {
 	session *mgo.Session
 	logger  *log.Logger
-	config  *Config
+	config  *StoreConfig
 }
 
-type Config struct {
-	Connection       *mongo.Config
-	SchemaVersionGte int
+type StoreConfig struct {
+	Connection    *mongo.Config `json:"mongo"`
+	SchemaVersion `json:"schemaVersion"`
+}
+
+type SchemaVersion struct {
+	Gte int
+	Lte int
 }
 
 //all queries will be built on top of this
-func getBaseQuery(groupId string, v int) bson.M {
-
-	log.Println("version ", v)
-
-	return bson.M{"_groupId": groupId, "_active": true, "_schemaVersion": bson.M{"$gte": v}}
+func (d MongoStoreClient) getBaseQuery(groupId string) bson.M {
+	d.logger.Printf("target schema version %v", d.config.SchemaVersion)
+	return bson.M{"_groupId": groupId, "_active": true, "_schemaVersion": bson.M{"$gte": d.config.Gte, "$lte": d.config.Lte}}
 }
 
-func NewMongoStoreClient(config *Config) *MongoStoreClient {
+func NewMongoStoreClient(config *StoreConfig) *MongoStoreClient {
 
 	mongoSession, err := mongo.Connect(config.Connection)
 	if err != nil {
@@ -118,7 +121,7 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
-		Find(getBaseQuery(groupId, d.config.SchemaVersionGte)).
+		Find(d.getBaseQuery(groupId)).
 		Sort("-time").
 		One(&result)
 
@@ -140,7 +143,7 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
-		Find(bson.M{"$and": []bson.M{getBaseQuery(groupId, d.config.SchemaVersionGte), bson.M{"deviceId": deviceId}}}).
+		Find(bson.M{"$and": []bson.M{d.getBaseQuery(groupId), bson.M{"deviceId": deviceId}}}).
 		Sort("-time").
 		One(&result)
 
@@ -172,7 +175,7 @@ func (d MongoStoreClient) constructQuery(details *model.QueryData) (query bson.M
 	for _, v := range details.MetaQuery {
 		//start with the base query
 
-		query = getBaseQuery(v, d.config.SchemaVersionGte)
+		query = d.getBaseQuery(v)
 		//add types
 		if len(details.Types) > 0 {
 			query["type"] = bson.M{"$in": details.Types}

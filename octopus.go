@@ -32,17 +32,14 @@ import (
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
 	"github.com/tidepool-org/go-common/clients/hakken"
-	"github.com/tidepool-org/go-common/clients/mongo"
 	"github.com/tidepool-org/go-common/clients/shoreline"
 )
 
 type (
 	Config struct {
 		clients.Config
-		Service          disc.ServiceListing `json:"service"`
-		Mongo            mongo.Config        `json:"mongo"`
-		SchemaVersionGte int                 `json:"schemaVersionGte"`
-		Api              api.Config          `json:"octopus"`
+		Service disc.ServiceListing `json:"service"`
+		Store   *sc.StoreConfig
 	}
 )
 
@@ -70,7 +67,7 @@ func main() {
 	}
 	defer hakkenClient.Close()
 
-	store := sc.NewMongoStoreClient(&sc.Config{Connection: &config.Mongo, SchemaVersionGte: config.SchemaVersionGte})
+	store := sc.NewMongoStoreClient(config.Store)
 
 	/*
 	 * Shoreline setup
@@ -98,7 +95,6 @@ func main() {
 
 	rtr := mux.NewRouter()
 	api := api.InitApi(
-		config.Api,
 		shorelineClient,
 		seagullClient,
 		gatekeeperClient,
