@@ -39,16 +39,28 @@ const (
 type MongoStoreClient struct {
 	session *mgo.Session
 	logger  *log.Logger
+	config  *StoreConfig
+}
+
+type StoreConfig struct {
+	Connection    *mongo.Config `json:"mongo"`
+	SchemaVersion `json:"schemaVersion"`
+}
+
+type SchemaVersion struct {
+	Minimum int
+	Maximum int
 }
 
 //all queries will be built on top of this
-func getBaseQuery(groupId string) bson.M {
-	return bson.M{"_groupId": groupId, "_active": true}
+func (d MongoStoreClient) getBaseQuery(groupId string) bson.M {
+	d.logger.Printf("target schema version %v", d.config.SchemaVersion)
+	return bson.M{"_groupId": groupId, "_active": true, "_schemaVersion": bson.M{"$gte": d.config.Minimum, "$lte": d.config.Maximum}}
 }
 
-func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
+func NewMongoStoreClient(config *StoreConfig) *MongoStoreClient {
 
-	mongoSession, err := mongo.Connect(config)
+	mongoSession, err := mongo.Connect(config.Connection)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,21 +68,21 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 	//Note 1:  the order of the fields is important and should match query order
 	//Note 2:  '-time' is the field we are sorting on must be the last field in the index
 	queryIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "type", "-time"},
+		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "-time"},
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryIndex)
 
 	//As above but includes uploadId for restriction of data returned
 	queryUploadIdIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "type", "uploadId", "-time"},
+		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", "-time"},
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
 
 	storeLogger := log.New(os.Stdout, "api/query:", log.Lshortfile)
 
-	return &MongoStoreClient{session: mongoSession, logger: storeLogger}
+	return &MongoStoreClient{session: mongoSession, logger: storeLogger, config: config}
 }
 
 func (d MongoStoreClient) Close() {
@@ -109,7 +121,7 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
-		Find(getBaseQuery(groupId)).
+		Find(d.getBaseQuery(groupId)).
 		Sort("-time").
 		One(&result)
 
@@ -131,7 +143,7 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
-		Find(bson.M{"$and": []bson.M{getBaseQuery(groupId), bson.M{"deviceId": deviceId}}}).
+		Find(bson.M{"$and": []bson.M{d.getBaseQuery(groupId), bson.M{"deviceId": deviceId}}}).
 		Sort("-time").
 		One(&result)
 
@@ -162,7 +174,8 @@ func getMongoOperator(op string) string {
 func (d MongoStoreClient) constructQuery(details *model.QueryData) (query bson.M, sort string) {
 	for _, v := range details.MetaQuery {
 		//start with the base query
-		query = getBaseQuery(v)
+
+		query = d.getBaseQuery(v)
 		//add types
 		if len(details.Types) > 0 {
 			query["type"] = bson.M{"$in": details.Types}

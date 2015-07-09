@@ -46,10 +46,6 @@ type (
 		ShorelineClient  ShorelineInterface
 		SeagullClient    SeagullInterface
 		GatekeeperClient GatekeeperInterface
-		Config           Config
-	}
-	Config struct {
-		ServerSecret string `json:"serverSecret"` //used for services
 	}
 
 	ShorelineInterface interface {
@@ -153,7 +149,6 @@ func (a *Api) getToken(req *http.Request) string {
 }
 
 func InitApi(
-	cfg Config,
 	slc ShorelineInterface,
 	sgc SeagullInterface,
 	gkc GatekeeperInterface,
@@ -164,7 +159,6 @@ func InitApi(
 		ShorelineClient:  slc,
 		SeagullClient:    sgc,
 		GatekeeperClient: gkc,
-		Config:           cfg,
 	}
 }
 
