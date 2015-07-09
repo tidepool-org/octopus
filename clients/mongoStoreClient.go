@@ -48,14 +48,14 @@ type StoreConfig struct {
 }
 
 type SchemaVersion struct {
-	Gte int
-	Lte int
+	Minimum int
+	Maximum int
 }
 
 //all queries will be built on top of this
 func (d MongoStoreClient) getBaseQuery(groupId string) bson.M {
 	d.logger.Printf("target schema version %v", d.config.SchemaVersion)
-	return bson.M{"_groupId": groupId, "_active": true, "_schemaVersion": bson.M{"$gte": d.config.Gte, "$lte": d.config.Lte}}
+	return bson.M{"_groupId": groupId, "_active": true, "_schemaVersion": bson.M{"$gte": d.config.Minimum, "$lte": d.config.Maximum}}
 }
 
 func NewMongoStoreClient(config *StoreConfig) *MongoStoreClient {

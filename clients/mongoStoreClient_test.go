@@ -43,7 +43,7 @@ const (
 )
 
 var (
-	all_schemas = SchemaVersion{Gte: 0, Lte: 99}
+	all_schemas = SchemaVersion{Minimum: 0, Maximum: 99}
 
 	theTime = "2014-10-23T10:00:00.000Z"
 
@@ -312,7 +312,7 @@ func TestSchemaVersion(t *testing.T) {
 	type found map[string]interface{}
 
 	//default is all data greater or equal to version 99 matters
-	schemaV1 := SchemaVersion{Gte: 1, Lte: 99}
+	schemaV1 := SchemaVersion{Minimum: 1, Maximum: 99}
 	mc1 := initTestData(t, initConfig(schemaV1))
 	resultsV1, _ := mc1.ExecuteQuery(allBasals)
 
@@ -358,7 +358,7 @@ func TestSchemaVersionRollback(t *testing.T) {
 	type found map[string]interface{}
 
 	//`rollback` so we only get schema 0
-	schemaVRollBack := SchemaVersion{Gte: 0, Lte: 0}
+	schemaVRollBack := SchemaVersion{Minimum: 0, Maximum: 0}
 	mcRollback := initTestData(t, initConfig(schemaVRollBack))
 	resultsVRollBack, _ := mcRollback.ExecuteQuery(allBasals)
 
