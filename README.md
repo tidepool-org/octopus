@@ -1,9 +1,9 @@
-octopus
+[DEPRECATED] octopus
 =======
 
 [![Build Status](https://travis-ci.org/tidepool-org/octopus.png)](https://travis-ci.org/tidepool-org/octopus)
 
-This is a data query API for Tidepool.
+**NOTE:** This was meant to be the data query J-API for Tidepool, but now after learning some hard lessons we are in the process of stepping away from that idea.
 
 It was initially created by [anderspitman](https://github.com/anderspitman) upon request by Tidepool.
 
