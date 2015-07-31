@@ -185,6 +185,10 @@ func TestExecuteQuery(t *testing.T) {
 			t.Fatalf("first rate [%d] should be 0.6", first["rate"])
 		}
 
+		if first["_schemaVersion"] == nil {
+			t.Fatal("_schemaVersion should be returned")
+		}
+
 		// test sec results
 		second := records[1]
 
@@ -206,6 +210,10 @@ func TestExecuteQuery(t *testing.T) {
 
 		if second["rate"] != 0.4 {
 			t.Fatalf("second rate [%d] should be 0.4", second["rate"])
+		}
+
+		if second["_schemaVersion"] == nil {
+			t.Fatal("_schemaVersion should be returned")
 		}
 	}
 }
