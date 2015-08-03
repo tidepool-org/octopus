@@ -224,7 +224,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	var results []interface{}
 	//we don't want to return these
-	filter := bson.M{"_id": 0, "_active": 0, "_schemaVersion": 0}
+	filter := bson.M{"_id": 0, "_active": 0}
 
 	startQueryTime := time.Now()
 	sessionCopy := d.session.Copy()
