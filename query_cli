@@ -53,7 +53,7 @@
 #
 # $ tp_query >output.txt
 # The query will be:
-# METAQUERY WHERE userid IS 467c4642d5 QUERY TYPE IN cbg WHERE time > 2014-08-20T00:00:00.000Z AND time < 2014-08-21T00:00:00.000Z SORT BY time AS Timestamp REVERSED
+# METAQUERY WHERE userid IS 467c4642d5 QUERY TYPE IN cbg WHERE time > 2014-08-20T00:00:00.000Z AND time < 2014-08-21T00:00:00.000Z
 
 # Enter to run the query or [c] to cancel:
 #   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
@@ -220,7 +220,7 @@ tp_query() {
         fi
     fi
 
-    QUERY="METAQUERY WHERE userid IS $TP_USERID QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
+    QUERY="METAQUERY WHERE userid IS $TP_USERID QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE"
 
     # send these prompts to stdout so that you can redirect the output of this
     # command to a file to save the result
@@ -249,7 +249,7 @@ tp_inquery() {
         QUERY_WHERE=$3
     fi
 
-    QUERY="METAQUERY WHERE userid IS $TP_USERID QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE SORT BY time AS Timestamp REVERSED"
+    QUERY="METAQUERY WHERE userid IS $TP_USERID QUERY TYPE IN $QUERY_TYPES $QUERY_WHERE"
 
     # send these prompts to stdout so that you can redirect the output of this
     # command to a file to save the result

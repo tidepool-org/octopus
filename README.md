@@ -70,7 +70,6 @@ Query to get all of a user’s update records:
 
     QUERY
         TYPE IN update
-        SORT BY time AS Timestamp REVERSED
 
 Query to get all of a user’s update records using the email address
 
@@ -79,7 +78,6 @@ Query to get all of a user’s update records using the email address
 
     QUERY
         TYPE IN update
-        SORT BY time AS Timestamp REVERSED
 
 Query to get a block of records in a given time range:
 
@@ -89,7 +87,6 @@ Query to get a block of records in a given time range:
     QUERY
         TYPE IN cbg, smbg, bolus, wizard
         WHERE time > starttime AND time < endtime
-        SORT BY time AS Timestamp REVERSED
 
 Query to get a block of records within a set of one or more upload IDs:
     METAQUERY
@@ -98,18 +95,16 @@ Query to get a block of records within a set of one or more upload IDs:
     QUERY
         TYPE IN cbg
         WHERE uploadId IN 4oiyhsdkh, 23498jsjsaf, ljlsadjfljasdf
-        SORT BY time AS Timestamp REVERSED
 
 You can also say NOT IN to reverse the sense of the test.
 
 You CANNOT currently combine the two types of WHERE clauses.
 
-
 Result will be a JSON array with individual records corresponding to the selected types, reverse sorted by date (from newest to oldest).
 
 The only acceptable `METAQUERY` is to query for a single userid. Aggregate metaqueries are not supported, and only the userids we give you will work.
 
-Results are sorted by the time field. `REVERSED` can be specified or omitted to control the sort, but you cannot sort by anything other than time (the rest of the sort clause is ignored).
+**NOTE:** Results are sorted by the `time` field.
 
 `TYPE IN` must be followed by a comma-separated list of types as defined in the [data formats documentation](http://developer.tidepool.io/data-model/v1/).
 

@@ -26,9 +26,8 @@ import (
 
 const (
 	ERROR_METAQUERY_REQUIRED = "Missing required METAQUERY e.g. METAQUERY WHERE userid IS 12d7bc90 or  METAQUERY WHERE emails CONTAINS foo@bar.org"
-	ERROR_SORT_REQUIRED      = "Missing required SORT BY e.g. SORT BY time AS Timestamp"
 	ERROR_TYPES_REQUIRED     = "Missing required TYPE IN e.g. TYPE IN cbg, smbg"
-	INWHERE_PAT              = `(?i)\bQUERY.+\bWHERE +([^ ]*) +(?:(NOT IN|IN) +)(.*)\bSORT`
+	INWHERE_PAT              = `(?i)\bQUERY.+\bWHERE +([^ ]*) +(?:(NOT IN|IN) +)(.*)`
 	ANYID                    = "anyid" // as an we can use either the userid or an email as an 'id' here
 )
 
@@ -38,7 +37,6 @@ type (
 		WhereConditions []WhereCondition
 		Types           []string
 		InList          []string
-		Sort            map[string]string
 		Reverse         bool
 	}
 	WhereCondition struct {
@@ -78,9 +76,6 @@ func (qd *QueryData) buildMetaQuery(raw string) error {
 		log.Printf("buildMetaQuery from %v gives error [%s]", emailsData, ERROR_METAQUERY_REQUIRED)
 		return errors.New(ERROR_METAQUERY_REQUIRED)
 	}
-
-	log.Printf("buildMetaQuery from %v gives error [%s]", useridData, ERROR_METAQUERY_REQUIRED)
-	return errors.New(ERROR_METAQUERY_REQUIRED)
 }
 
 func (qd *QueryData) buildTypes(raw string) error {
@@ -88,7 +83,7 @@ func (qd *QueryData) buildTypes(raw string) error {
 	typesData := typesMatch.FindStringSubmatch(raw)
 
 	if len(typesData) != 2 {
-		typesMatch = regexp.MustCompile(`(?i)\bQUERY TYPE IN (.*) \bSORT`)
+		typesMatch = regexp.MustCompile(`(?i)\bQUERY TYPE IN (.*)`)
 		typesData = typesMatch.FindStringSubmatch(raw)
 	}
 
@@ -105,26 +100,8 @@ func (qd *QueryData) buildTypes(raw string) error {
 	return errors.New(ERROR_TYPES_REQUIRED)
 }
 
-func (qd *QueryData) buildSort(raw string) error {
-	sortMatch := regexp.MustCompile(`(?i)\bSORT BY (.*) AS (.*) REVERSED\b`)
-	sortData := sortMatch.FindStringSubmatch(raw)
-
-	if len(sortData) != 3 {
-		sortMatch = regexp.MustCompile(`(?i)\bSORT BY (.*) AS (.*)`)
-		sortData = sortMatch.FindStringSubmatch(raw)
-	}
-
-	if len(sortData) == 3 {
-		qd.Sort = map[string]string{strings.TrimSpace(sortData[1]): strings.TrimSpace(sortData[2])}
-		return nil
-	}
-
-	log.Printf("buildSort from %v gives error [%s]", raw, ERROR_SORT_REQUIRED)
-	return errors.New(ERROR_SORT_REQUIRED)
-}
-
 func (qd *QueryData) isTimeWhere(raw string) bool {
-	where := regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) (AND (.*) (.*) (.*) )?\bSORT`)
+	where := regexp.MustCompile(`(?i)(?:^METAQUERY.+)?QUERY.+\bWHERE (.*) (.*) (.*) (AND (.*) (.*) (.*) )?`)
 	indices := where.FindStringIndex(raw)
 	return indices != nil
 }
@@ -136,7 +113,7 @@ func (qd *QueryData) isInWhere(raw string) bool {
 }
 
 func (qd *QueryData) buildTimeWhere(raw string) {
-	where := regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*) \bSORT`)
+	where := regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) AND (.*) (.*) (.*)`)
 	whereData := where.FindStringSubmatch(raw)
 
 	if len(whereData) == 7 {
@@ -154,7 +131,7 @@ func (qd *QueryData) buildTimeWhere(raw string) {
 
 		return
 	} else {
-		where = regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*) \bSORT`)
+		where = regexp.MustCompile(`(?i)[^METAQUERY] \bWHERE (.*) (.*) (.*)`)
 		whereData = where.FindStringSubmatch(raw)
 
 		if len(whereData) == 4 {
@@ -212,9 +189,6 @@ func BuildQuery(raw string) (parseErrs []error, qd *QueryData) {
 	}
 	if typeErr := qd.buildTypes(raw); typeErr != nil {
 		parseErrs = append(parseErrs, typeErr)
-	}
-	if sortErr := qd.buildSort(raw); sortErr != nil {
-		parseErrs = append(parseErrs, sortErr)
 	}
 	if qd.isInWhere(raw) {
 		qd.buildInWhere(raw)

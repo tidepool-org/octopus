@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	QUERY_WHERE_AND  = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z SORT BY time AS Timestamp REVERSED"
-	QUERY_WHERE      = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
-	METAQUERY_EMAILS = "METAQUERY WHERE emails CONTAINS foo@bar.com QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
-	QUERY_WHERE_IN   = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg WHERE updateId NOT IN abcd, efgh, ijkl SORT BY time AS Timestamp REVERSED"
+	QUERY_WHERE_AND  = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time > 2015-01-01T00:00:00.000Z AND time < 2015-01-01T01:00:00.000Z"
+	QUERY_WHERE      = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z"
+	METAQUERY_EMAILS = "METAQUERY WHERE emails CONTAINS foo@bar.com QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z"
+	QUERY_WHERE_IN   = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg WHERE updateId NOT IN abcd, efgh, ijkl"
 	IS_REVERSE       = "blah blah reversed"
 	IS_REVERSE_CASE  = "blah blah REVERSED"
 	NOT_REVERSE      = "blah blah"
@@ -126,7 +126,7 @@ func TestMetaQueryWhere_Emails(t *testing.T) {
 
 func TestMetaQueryWhere_Bad(t *testing.T) {
 
-	const METAQUERY_BAD = "METAQUERY WHERE bad IS wrong QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z SORT BY time AS Timestamp REVERSED"
+	const METAQUERY_BAD = "METAQUERY WHERE bad IS wrong QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z"
 
 	qd := &QueryData{}
 
@@ -143,6 +143,8 @@ func TestQueryWhereAnd(t *testing.T) {
 	qd := &QueryData{}
 
 	qd.buildTimeWhere(QUERY_WHERE_AND)
+
+	t.Logf("%v", qd)
 
 	if len(qd.WhereConditions) != 2 {
 		t.Fatalf("there should be two where conditions got %v", qd.WhereConditions)
@@ -236,28 +238,6 @@ func TestTypes(t *testing.T) {
 
 }
 
-func TestSort_GivesError_WhenNoSortBy(t *testing.T) {
-	qd := &QueryData{}
-
-	noSortErr := qd.buildSort("QUERY TYPE IN update, cbg, smbg AS Timestamp REVERSED")
-
-	if noSortErr.Error() != ERROR_SORT_REQUIRED {
-		t.Fatalf("got err [%s] expected err [%s]", noSortErr.Error(), ERROR_SORT_REQUIRED)
-	}
-
-}
-
-func TestSort_GivesError_WhenNoSortByAs(t *testing.T) {
-	qd := &QueryData{}
-
-	noSortAsErr := qd.buildSort("QUERY TYPE IN update, cbg, smbg SORT BY time")
-
-	if noSortAsErr.Error() != ERROR_SORT_REQUIRED {
-		t.Fatalf("got err [%s] expected err [%s]", noSortAsErr.Error(), ERROR_SORT_REQUIRED)
-	}
-
-}
-
 func TestBuildQuery_WithWhereAnd(t *testing.T) {
 
 	//lets test it all
@@ -286,10 +266,6 @@ func TestBuildQuery_WithWhereAnd(t *testing.T) {
 
 	if qd.Types[2] != "smbg" {
 		t.Fatalf("type should have been smbg but [%s]", qd.Types[2])
-	}
-
-	if qd.Reverse != true {
-		t.Fatalf("should be reversed")
 	}
 
 	if len(qd.WhereConditions) != 2 {
@@ -336,10 +312,6 @@ func TestBuildQuery_WithWhere(t *testing.T) {
 		t.Fatalf("type should have been smbg but [%s]", qd.Types[2])
 	}
 
-	if qd.Reverse != true {
-		t.Fatalf("should be reversed")
-	}
-
 	if len(qd.WhereConditions) != 1 {
 		t.Fatalf("there should be 1 conditions but got [%d]", len(qd.WhereConditions))
 	}
@@ -372,10 +344,6 @@ func TestBuildQuery_WithWhereIn(t *testing.T) {
 		t.Fatalf("type should have been cbg but [%s]", qd.Types[0])
 	}
 
-	if qd.Reverse != true {
-		t.Fatalf("should be reversed")
-	}
-
 	if len(qd.WhereConditions) != 1 {
 		t.Fatalf("there should be 1 conditions but got [%d]", len(qd.WhereConditions))
 	}
@@ -398,8 +366,8 @@ func TestExtractQueryData_AccumulatesErrors(t *testing.T) {
 
 	errs, _ := BuildQuery("blah blah")
 
-	if len(errs) != 3 {
-		t.Fatalf("there should be errors [%d]", len(errs))
+	if len(errs) != 2 {
+		t.Fatalf("there should be TWO errors but got [%d]", len(errs))
 	}
 
 }

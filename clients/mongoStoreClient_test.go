@@ -51,15 +51,11 @@ var (
 		MetaQuery:       map[string]string{"userid": valid_userid},
 		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "time", Value: theTime, Condition: "<"}},
 		Types:           []string{"basal"},
-		Sort:            map[string]string{"time": "myTime"},
-		Reverse:         false,
 	}
 
 	noDataQd = &model.QueryData{
 		MetaQuery: map[string]string{"userid": no_match_userid},
 		Types:     []string{"no_data"},
-		Sort:      map[string]string{"time": "myTime"},
-		Reverse:   false,
 	}
 )
 
@@ -115,6 +111,8 @@ func TestIndexes(t *testing.T) {
 		//index names based on feilds used
 		std_query_idx      = "_groupId_1__active_1__schemaVersion_1_type_1_time_-1"
 		uploadid_query_idx = "_groupId_1__active_1__schemaVersion_1_type_1_uploadId_1_time_-1"
+		time_idx           = "time_-1"
+		id_idx             = "_id_"
 	)
 	mc := initTestData(t, initConfig(all_schemas))
 
@@ -125,8 +123,8 @@ func TestIndexes(t *testing.T) {
 		t.Fatal("TestIndexes unexpected error ", err.Error())
 	} else {
 		// there are the two we have added and also the standard index
-		if len(idxs) != 3 {
-			t.Fatalf("TestIndexes should be 3 but found [%d] ", len(idxs))
+		if len(idxs) != 4 {
+			t.Fatalf("TestIndexes should be FOUR but found [%d] ", len(idxs))
 		}
 
 		if idxs[0].Name != std_query_idx {
@@ -135,6 +133,14 @@ func TestIndexes(t *testing.T) {
 
 		if idxs[1].Name != uploadid_query_idx {
 			t.Fatalf("TestIndexes expected [%s] got [%s] ", uploadid_query_idx, idxs[1].Name)
+		}
+
+		if idxs[2].Name != id_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", id_idx, idxs[2].Name)
+		}
+
+		if idxs[3].Name != time_idx {
+			t.Fatalf("TestIndexes expected [%s] got [%s] ", time_idx, idxs[3].Name)
 		}
 	}
 }
@@ -177,12 +183,14 @@ func TestExecuteQuery(t *testing.T) {
 		if firstTimeIs.After(timeClause) {
 			t.Fatalf("first time [%v] should be before than [%v] ", firstTimeIs, timeClause)
 		}
-		if first["time"] != "2014-10-23T07:00:00.000Z" {
-			t.Fatalf("first time [%s] should be 2014-10-23T07:00:00.000Z", first["time"])
+
+		//NOTE: times are in reverse order
+		if first["time"] != "2014-10-23T08:00:00.000Z" {
+			t.Fatalf("first time [%s] should be 2014-10-23T08:00:00.000Z", first["time"])
 		}
 
-		if first["rate"] != 0.6 {
-			t.Fatalf("first rate [%d] should be 0.6", first["rate"])
+		if first["rate"] != 0.4 {
+			t.Fatalf("first rate [%s] should be 0.4", first["rate"])
 		}
 
 		if first["_schemaVersion"] == nil {
@@ -204,12 +212,13 @@ func TestExecuteQuery(t *testing.T) {
 		if secondTimeIs.After(timeClause) {
 			t.Fatalf(" second time [%v] should be before than [%v] ", secondTimeIs, timeClause)
 		}
-		if second["time"] != "2014-10-23T08:00:00.000Z" {
-			t.Fatalf("second time [%s] should be 2014-10-23T08:00:00.000Z", second["time"])
+		//NOTE: times are in reverse order
+		if second["time"] != "2014-10-23T07:00:00.000Z" {
+			t.Fatalf("second time [%s] should be 2014-10-23T07:00:00.000Z", second["time"])
 		}
 
-		if second["rate"] != 0.4 {
-			t.Fatalf("second rate [%d] should be 0.4", second["rate"])
+		if second["rate"] != 0.6 {
+			t.Fatalf("second rate [%d] should be 0.6", second["rate"])
 		}
 
 		if second["_schemaVersion"] == nil {
@@ -314,7 +323,6 @@ func TestSchemaVersion(t *testing.T) {
 	allBasals := &model.QueryData{
 		MetaQuery: map[string]string{"userid": valid_userid},
 		Types:     []string{"basal"},
-		Sort:      map[string]string{"time": "myTime"},
 	}
 
 	type found map[string]interface{}
@@ -337,7 +345,6 @@ func TestSchemaVersionAll(t *testing.T) {
 	allBasals := &model.QueryData{
 		MetaQuery: map[string]string{"userid": valid_userid},
 		Types:     []string{"basal"},
-		Sort:      map[string]string{"time": "myTime"},
 	}
 
 	type found map[string]interface{}
@@ -360,7 +367,6 @@ func TestSchemaVersionRollback(t *testing.T) {
 	allBasals := &model.QueryData{
 		MetaQuery: map[string]string{"userid": valid_userid},
 		Types:     []string{"basal"},
-		Sort:      map[string]string{"time": "myTime"},
 	}
 
 	type found map[string]interface{}
@@ -385,17 +391,12 @@ func Test_constructQuery_WhereQueryConstruction(t *testing.T) {
 		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "Stuff", Value: "123", Condition: ">"}},
 		Types:           []string{"cbg", "smbg"},
 		InList:          []string{},
-		Sort:            map[string]string{"time": "myTime"},
 		Reverse:         false,
 	}
 
 	store := NewMongoStoreClient(initConfig(all_schemas))
 
-	query, sort := store.constructQuery(ourData)
-
-	if sort != "time" {
-		t.Fatalf("sort returned [%s] but should be time", sort)
-	}
+	query := store.constructQuery(ourData)
 
 	if query["_groupId"] != "1234" {
 		t.Fatalf("_groupId [%v] should have been set to given 1234", query)
@@ -429,17 +430,12 @@ func TestInQueryConstruction(t *testing.T) {
 		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "updateId", Value: "NOTHING", Condition: "IN"}},
 		Types:           []string{"cbg"},
 		InList:          []string{"firstId", "secondId"},
-		Sort:            map[string]string{"time": "myTime"},
 		Reverse:         false,
 	}
 
 	store := NewMongoStoreClient(initConfig(all_schemas))
 
-	query, sort := store.constructQuery(ourData)
-
-	if sort != "time" {
-		t.Fatalf("sort returned [%s] but should be time", sort)
-	}
+	query := store.constructQuery(ourData)
 
 	if query["_groupId"] != "1234" {
 		t.Fatalf("_groupId [%v] should have been set to given 1234", query)

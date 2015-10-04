@@ -34,6 +34,7 @@ import (
 
 const (
 	DEVICE_DATA_COLLECTION = "deviceData"
+	sort_time              = "-time"
 )
 
 type MongoStoreClient struct {
@@ -68,17 +69,24 @@ func NewMongoStoreClient(config *StoreConfig) *MongoStoreClient {
 	//Note 1:  the order of the fields is important and should match query order
 	//Note 2:  '-time' is the field we are sorting on must be the last field in the index
 	queryIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "-time"},
+		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", sort_time},
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryIndex)
 
 	//As above but includes uploadId for restriction of data returned
 	queryUploadIdIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", "-time"},
+		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", sort_time},
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
+
+	//time index used for sorts
+	timeIndex := mgo.Index{
+		Key:        []string{sort_time},
+		Background: true,
+	}
+	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(timeIndex)
 
 	storeLogger := log.New(os.Stdout, "api/query:", log.Lshortfile)
 
@@ -122,7 +130,7 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(d.getBaseQuery(groupId)).
-		Sort("-time").
+		Sort(sort_time).
 		One(&result)
 
 	if err != nil {
@@ -144,7 +152,7 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(bson.M{"$and": []bson.M{d.getBaseQuery(groupId), bson.M{"deviceId": deviceId}}}).
-		Sort("-time").
+		Sort(sort_time).
 		One(&result)
 
 	if err != nil {
@@ -171,7 +179,7 @@ func getMongoOperator(op string) string {
 	}
 }
 
-func (d MongoStoreClient) constructQuery(details *model.QueryData) (query bson.M, sort string) {
+func (d MongoStoreClient) constructQuery(details *model.QueryData) (query bson.M) {
 	for _, v := range details.MetaQuery {
 		//start with the base query
 
@@ -204,22 +212,14 @@ func (d MongoStoreClient) constructQuery(details *model.QueryData) (query bson.M
 		}
 		d.logger.Printf("mongo query %#v", query)
 	}
-	//sort field and order
-	for k := range details.Sort {
-		sort = k
-		if details.Reverse {
-			sort = "-" + sort
-		}
-	}
-
-	return query, sort
+	return query
 }
 
 func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error) {
 
 	startTime := time.Now()
 
-	query, sort := d.constructQuery(details)
+	query := d.constructQuery(details)
 	d.logger.Println(fmt.Sprintf("mongo query built in [%.5f] secs", time.Now().Sub(startTime).Seconds()))
 
 	var results []interface{}
@@ -232,7 +232,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
-		Sort(sort).
+		Sort(sort_time). //we will always sort by time
 		Select(filter).
 		All(&results)
 
