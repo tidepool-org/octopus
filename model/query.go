@@ -37,7 +37,6 @@ type (
 		WhereConditions []WhereCondition
 		Types           []string
 		InList          []string
-		Reverse         bool
 	}
 	WhereCondition struct {
 		Name      string
@@ -169,17 +168,6 @@ func (qd *QueryData) buildInWhere(raw string) {
 	log.Printf("buildInWhere from [%s] shows incorrect or no where clause", raw)
 }
 
-func (qd *QueryData) buildOrder(raw string) {
-
-	qd.Reverse = false
-
-	if strings.Index(strings.ToLower(raw), "reverse") != -1 {
-		qd.Reverse = true
-	}
-
-	return
-}
-
 func BuildQuery(raw string) (parseErrs []error, qd *QueryData) {
 
 	qd = &QueryData{}
@@ -195,7 +183,6 @@ func BuildQuery(raw string) (parseErrs []error, qd *QueryData) {
 	} else if qd.isTimeWhere(raw) {
 		qd.buildTimeWhere(raw)
 	}
-	qd.buildOrder(raw)
 
 	return parseErrs, qd
 }

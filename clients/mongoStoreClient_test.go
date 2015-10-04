@@ -391,7 +391,6 @@ func Test_constructQuery_WhereQueryConstruction(t *testing.T) {
 		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "Stuff", Value: "123", Condition: ">"}},
 		Types:           []string{"cbg", "smbg"},
 		InList:          []string{},
-		Reverse:         false,
 	}
 
 	store := NewMongoStoreClient(initConfig(all_schemas))
@@ -430,7 +429,6 @@ func TestInQueryConstruction(t *testing.T) {
 		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "updateId", Value: "NOTHING", Condition: "IN"}},
 		Types:           []string{"cbg"},
 		InList:          []string{"firstId", "secondId"},
-		Reverse:         false,
 	}
 
 	store := NewMongoStoreClient(initConfig(all_schemas))

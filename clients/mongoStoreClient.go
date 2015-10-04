@@ -34,7 +34,7 @@ import (
 
 const (
 	DEVICE_DATA_COLLECTION = "deviceData"
-	sort_time              = "-time"
+	sort_time_descending   = "-time"
 )
 
 type MongoStoreClient struct {
@@ -69,21 +69,21 @@ func NewMongoStoreClient(config *StoreConfig) *MongoStoreClient {
 	//Note 1:  the order of the fields is important and should match query order
 	//Note 2:  '-time' is the field we are sorting on must be the last field in the index
 	queryIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", sort_time},
+		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", sort_time_descending},
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryIndex)
 
 	//As above but includes uploadId for restriction of data returned
 	queryUploadIdIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", sort_time},
+		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", sort_time_descending},
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
 
 	//time index used for sorts
 	timeIndex := mgo.Index{
-		Key:        []string{sort_time},
+		Key:        []string{sort_time_descending},
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(timeIndex)
@@ -130,7 +130,7 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) ([]byte, error) {
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(d.getBaseQuery(groupId)).
-		Sort(sort_time).
+		Sort(sort_time_descending).
 		One(&result)
 
 	if err != nil {
@@ -152,7 +152,7 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	// Get the entry with the latest time by reverse sorting and taking the first value
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(bson.M{"$and": []bson.M{d.getBaseQuery(groupId), bson.M{"deviceId": deviceId}}}).
-		Sort(sort_time).
+		Sort(sort_time_descending).
 		One(&result)
 
 	if err != nil {
@@ -232,7 +232,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
-		Sort(sort_time). //we will always sort by time
+		Sort(sort_time_descending). //we will always sort by time
 		Select(filter).
 		All(&results)
 

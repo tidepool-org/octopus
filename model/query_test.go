@@ -26,45 +26,7 @@ const (
 	QUERY_WHERE      = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z"
 	METAQUERY_EMAILS = "METAQUERY WHERE emails CONTAINS foo@bar.com QUERY TYPE IN update, cbg, smbg WHERE time >= 2015-01-01T00:00:00.000Z"
 	QUERY_WHERE_IN   = "METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg WHERE updateId NOT IN abcd, efgh, ijkl"
-	IS_REVERSE       = "blah blah reversed"
-	IS_REVERSE_CASE  = "blah blah REVERSED"
-	NOT_REVERSE      = "blah blah"
 )
-
-func TestReverse_True(t *testing.T) {
-	qd := &QueryData{}
-
-	qd.buildOrder(IS_REVERSE)
-
-	if qd.Reverse == false {
-		t.Fatalf(" reverse should have been true")
-	}
-
-}
-
-func TestReverse_False(t *testing.T) {
-	qd := &QueryData{}
-
-	qd.buildOrder(NOT_REVERSE)
-
-	if qd.Reverse == true {
-		t.Fatalf(" reverse should have been false")
-	}
-
-}
-
-func TestReverse_IgnoresCase(t *testing.T) {
-	qd1 := &QueryData{}
-	qd2 := &QueryData{}
-
-	qd1.buildOrder(IS_REVERSE)
-	qd2.buildOrder(IS_REVERSE_CASE)
-
-	if qd1.Reverse != qd2.Reverse {
-		t.Fatalf("should have the same result as we ignore case")
-	}
-
-}
 
 func TestMetaQuery_GivesError_WhenNoWhere(t *testing.T) {
 	qd := &QueryData{}
