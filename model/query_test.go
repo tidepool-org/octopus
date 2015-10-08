@@ -106,8 +106,6 @@ func TestQueryWhereAnd(t *testing.T) {
 
 	qd.buildTimeWhere(QUERY_WHERE_AND)
 
-	t.Logf("%v", qd)
-
 	if len(qd.WhereConditions) != 2 {
 		t.Fatalf("there should be two where conditions got %v", qd.WhereConditions)
 	}
