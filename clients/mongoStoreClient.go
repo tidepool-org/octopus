@@ -35,7 +35,9 @@ import (
 const (
 	DEVICE_DATA_COLLECTION = "deviceData"
 	sort_time_descending   = "-time"
+)
 
+var (
 	//the feilds we use for the different query types and associated indexes
 	query_fields          = []string{"_groupId", "_active", "_schemaVersion", "type", sort_time_descending}
 	uploadid_query_fields = []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", sort_time_descending}
@@ -229,7 +231,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
-		Sort(query_fields). //sort by time but use full index
+		Sort(query_fields...). //sort by time but use full index
 		Select(filter).
 		All(&results)
 
