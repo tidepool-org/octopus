@@ -35,6 +35,10 @@ import (
 const (
 	DEVICE_DATA_COLLECTION = "deviceData"
 	sort_time_descending   = "-time"
+
+	//the feilds we use for the different query types and associated indexes
+	query_fields          = []string{"_groupId", "_active", "_schemaVersion", "type", sort_time_descending}
+	uploadid_query_fields = []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", sort_time_descending}
 )
 
 type MongoStoreClient struct {
@@ -69,24 +73,17 @@ func NewMongoStoreClient(config *StoreConfig) *MongoStoreClient {
 	//Note 1:  the order of the fields is important and should match query order
 	//Note 2:  '-time' is the field we are sorting on must be the last field in the index
 	queryIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", sort_time_descending},
+		Key:        query_fields,
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryIndex)
 
 	//As above but includes uploadId for restriction of data returned
 	queryUploadIdIndex := mgo.Index{
-		Key:        []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", sort_time_descending},
+		Key:        uploadid_query_fields,
 		Background: true,
 	}
 	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(queryUploadIdIndex)
-
-	//time index used for sorts
-	timeIndex := mgo.Index{
-		Key:        []string{sort_time_descending},
-		Background: true,
-	}
-	mongoSession.DB("").C(DEVICE_DATA_COLLECTION).EnsureIndex(timeIndex)
 
 	storeLogger := log.New(os.Stdout, "api/query:", log.Lshortfile)
 
@@ -232,7 +229,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
-		Sort(sort_time_descending). //we will always sort by time
+		Sort(query_fields). //sort by time but use full index
 		Select(filter).
 		All(&results)
 
