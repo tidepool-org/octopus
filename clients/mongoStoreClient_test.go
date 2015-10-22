@@ -51,7 +51,6 @@ var (
 		MetaQuery: map[string]string{"userid": valid_userid},
 		WhereConditions: []model.WhereCondition{
 			model.WhereCondition{Name: "time", Value: theTime, Condition: "<"},
-			model.WhereCondition{Name: "uploadId", Value: "NOT USED", Condition: "NOT IN"},
 		},
 		Types: []string{"basal"},
 	}
