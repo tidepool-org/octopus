@@ -35,12 +35,13 @@ import (
 const (
 	DEVICE_DATA_COLLECTION = "deviceData"
 	sort_time_descending   = "-time"
+	uploadid_field         = "uploadId"
 )
 
 var (
 	//the feilds we use for the different query types and associated indexes
 	query_fields          = []string{"_groupId", "_active", "_schemaVersion", "type", sort_time_descending}
-	uploadid_query_fields = []string{"_groupId", "_active", "_schemaVersion", "type", "uploadId", sort_time_descending}
+	uploadid_query_fields = []string{"_groupId", "_active", "_schemaVersion", "type", uploadid_field, sort_time_descending}
 )
 
 type MongoStoreClient struct {
@@ -219,11 +220,18 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 	startTime := time.Now()
 
 	query := d.constructQuery(details)
+
 	d.logger.Println(fmt.Sprintf("mongo query built in [%.5f] secs", time.Now().Sub(startTime).Seconds()))
 
 	var results []interface{}
 	//we don't want to return these
 	filter := bson.M{"_id": 0, "_active": 0}
+	//sort fields
+	sortFields := query_fields
+	if query[uploadid_field] != nil {
+		//switch if uploadId is included
+		sortFields = uploadid_query_fields
+	}
 
 	startQueryTime := time.Now()
 	sessionCopy := d.session.Copy()
@@ -231,7 +239,7 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) ([]byte, error)
 
 	err := sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
-		Sort(query_fields...). //sort by time but use full index
+		Sort(sortFields...). //sort by time but use full index based on query
 		Select(filter).
 		All(&results)
 

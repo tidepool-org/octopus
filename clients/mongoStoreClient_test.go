@@ -48,9 +48,20 @@ var (
 	theTime = "2014-10-23T10:00:00.000Z"
 
 	basalsQd = &model.QueryData{
-		MetaQuery:       map[string]string{"userid": valid_userid},
-		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "time", Value: theTime, Condition: "<"}},
-		Types:           []string{"basal"},
+		MetaQuery: map[string]string{"userid": valid_userid},
+		WhereConditions: []model.WhereCondition{
+			model.WhereCondition{Name: "time", Value: theTime, Condition: "<"},
+			model.WhereCondition{Name: "uploadId", Value: "NOT USED", Condition: "NOT IN"},
+		},
+		Types: []string{"basal"},
+	}
+
+	basalsUploadIdQd = &model.QueryData{
+		MetaQuery: map[string]string{"userid": valid_userid},
+		WhereConditions: []model.WhereCondition{
+			model.WhereCondition{Name: "uploadId", Value: "NOT USED", Condition: "NOT IN"},
+		},
+		Types: []string{"basal"},
 	}
 
 	noDataQd = &model.QueryData{
