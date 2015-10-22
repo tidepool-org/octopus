@@ -48,9 +48,19 @@ var (
 	theTime = "2014-10-23T10:00:00.000Z"
 
 	basalsQd = &model.QueryData{
-		MetaQuery:       map[string]string{"userid": valid_userid},
-		WhereConditions: []model.WhereCondition{model.WhereCondition{Name: "time", Value: theTime, Condition: "<"}},
-		Types:           []string{"basal"},
+		MetaQuery: map[string]string{"userid": valid_userid},
+		WhereConditions: []model.WhereCondition{
+			model.WhereCondition{Name: "time", Value: theTime, Condition: "<"},
+		},
+		Types: []string{"basal"},
+	}
+
+	basalsUploadIdQd = &model.QueryData{
+		MetaQuery: map[string]string{"userid": valid_userid},
+		WhereConditions: []model.WhereCondition{
+			model.WhereCondition{Name: "uploadId", Value: "NOT USED", Condition: "NOT IN"},
+		},
+		Types: []string{"basal"},
 	}
 
 	noDataQd = &model.QueryData{
@@ -111,7 +121,6 @@ func TestIndexes(t *testing.T) {
 		//index names based on feilds used
 		std_query_idx      = "_groupId_1__active_1__schemaVersion_1_type_1_time_-1"
 		uploadid_query_idx = "_groupId_1__active_1__schemaVersion_1_type_1_uploadId_1_time_-1"
-		time_idx           = "time_-1"
 		id_idx             = "_id_"
 	)
 	mc := initTestData(t, initConfig(all_schemas))
@@ -123,8 +132,8 @@ func TestIndexes(t *testing.T) {
 		t.Fatal("TestIndexes unexpected error ", err.Error())
 	} else {
 		// there are the two we have added and also the standard index
-		if len(idxs) != 4 {
-			t.Fatalf("TestIndexes should be FOUR but found [%d] ", len(idxs))
+		if len(idxs) != 3 {
+			t.Fatalf("TestIndexes should be THREE but found [%d] ", len(idxs))
 		}
 
 		if idxs[0].Name != std_query_idx {
@@ -139,9 +148,6 @@ func TestIndexes(t *testing.T) {
 			t.Fatalf("TestIndexes expected [%s] got [%s] ", id_idx, idxs[2].Name)
 		}
 
-		if idxs[3].Name != time_idx {
-			t.Fatalf("TestIndexes expected [%s] got [%s] ", time_idx, idxs[3].Name)
-		}
 	}
 }
 
