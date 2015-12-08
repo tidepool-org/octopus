@@ -70,14 +70,14 @@
 tp_setserver() {
     if [ "$1" = "local" ]; then
         TIDEPOOL_SERVER="http://localhost:8009"
-    elif [ "$1" = "devel" ]; then
-        TIDEPOOL_SERVER="https://devel-api.tidepool.io"
-    elif [ "$1" = "staging" ]; then
-        TIDEPOOL_SERVER="https://staging-api.tidepool.io"
-    elif [ "$1" = "prod" ]; then
-        TIDEPOOL_SERVER="https://api.tidepool.io"
+    elif [ "$1" = "dev" ]; then
+        TIDEPOOL_SERVER="https://dev-api.tidepool.org"
+    elif [ "$1" = "stg" ]; then
+        TIDEPOOL_SERVER="https://stg-api.tidepool.org"
+    elif [ "$1" = "prd" ]; then
+        TIDEPOOL_SERVER="https://api.tidepool.org"
     else
-        echo "you must specify local, devel, staging, or prod"
+        echo "you must specify local, dev, stg, or prd"
     fi
 }
 
@@ -271,7 +271,7 @@ tp() {
         echo "Helps you do certain structured queries to Tidepool servers."
         echo "Supported commands: "
         echo "   tp login email@addr.com"
-        echo "   tp setserver SERVER -- SERVER can be local, devel, staging, or prod"
+        echo "   tp setserver SERVER -- SERVER can be local, dev, stg, or prd"
         echo "   tp setuser USERID"
         echo "   tp settypes RECORDTYPES -- e.g, 'cbg, upload'"
         echo "   tp setstartdate YYYY-MM-DD"
@@ -318,4 +318,3 @@ tp() {
 }
 
 echo "Type 'tp help' for help."
-
