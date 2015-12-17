@@ -55,7 +55,7 @@ type (
 	}
 
 	GatekeeperInterface interface {
-		UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error)
+		UserInGroup(userID, groupID string) (commonClients.Permissions, error)
 	}
 
 	SeagullInterface interface {

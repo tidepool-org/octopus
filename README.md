@@ -134,7 +134,7 @@ There is a packaged set of scripts, the [query_cli](http://developer.tidepool.io
 
 * login using an existing tidepool-account
 ```
-tp_login <user_name>
+tp_login <username>
 ```
 * with that account query the data of accounts that you have
 ```

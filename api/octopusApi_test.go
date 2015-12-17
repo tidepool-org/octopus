@@ -75,7 +75,7 @@ func (slc MockShorelineClient) TokenProvide() string {
 
 func (slc MockShorelineClient) GetUser(userID, token string) (*shoreline.UserData, error) {
 	log.Print("MockShorelineClient.GetUser", "return the user asked for")
-	return &shoreline.UserData{UserID: userID, UserName: userID, Emails: []string{userID}}, nil
+	return &shoreline.UserData{UserID: userID, Username: userID, Emails: []string{userID}}, nil
 }
 
 func (sgc MockSeagullClient) GetPrivatePair(userID, hashName, token string) *commonClients.PrivatePair {
@@ -86,9 +86,9 @@ func (sgc MockSeagullClient) GetPrivatePair(userID, hashName, token string) *com
 	return &commonClients.PrivatePair{ID: hashName, Value: "value-to-use"}
 }
 
-func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (map[string]commonClients.Permissions, error) {
-	permissonsToReturn := make(map[string]commonClients.Permissions)
-	p := make(commonClients.Permissions)
+func (gkc MockGateKeeperClient) UserInGroup(userID, groupID string) (commonClients.Permissions, error) {
+	permissonsToReturn := make(commonClients.Permissions)
+	p := make(commonClients.Permission)
 
 	log.Printf("user [%s] group [%s]", userID, groupID)
 
