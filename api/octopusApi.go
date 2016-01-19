@@ -27,7 +27,7 @@ import (
 
 	httpgzip "github.com/daaku/go.httpgzip"
 	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
 
@@ -284,7 +284,7 @@ func buildQueryFrom(req *http.Request) (*model.QueryData, *detailedError) {
 
 //as `userid` from our query could infact be an email we need to resolve that and then get the associated groupId or return any detailedError
 func (a *Api) getGroupForQueriedUser(req *http.Request, givenId string) (string, *detailedError) {
-	resolvedUser, err := a.ShorelineClient.GetUser(givenId, a.getToken(req))
+	resolvedUser, err := a.ShorelineClient.GetUser(givenId, a.ShorelineClient.TokenProvide())
 	if err != nil {
 		return "", error_no_userid.setInternalMessage(err)
 	}
