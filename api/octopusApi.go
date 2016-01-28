@@ -282,13 +282,16 @@ func buildQueryFrom(req *http.Request) (*model.QueryData, *detailedError) {
 	return qd, nil
 }
 
-//as `userid` from our query could infact be an email we need to resolve that and then get the associated groupId or return any detailedError
-func (a *Api) getGroupForQueriedUser(req *http.Request, givenId string) (string, *detailedError) {
-	resolvedUser, err := a.ShorelineClient.GetUser(givenId, a.ShorelineClient.TokenProvide())
+func (a *Api) getUserIdForQueriedId(queriedId string) (string, *detailedError) {
+	user, err := a.ShorelineClient.GetUser(queriedId, a.ShorelineClient.TokenProvide())
 	if err != nil {
 		return "", error_no_userid.setInternalMessage(err)
 	}
-	group := a.SeagullClient.GetPrivatePair(resolvedUser.UserID, "uploads", a.ShorelineClient.TokenProvide())
+	return user.UserID, nil
+}
+
+func (a *Api) getGroupIdForUserId(userId string) (string, *detailedError) {
+	group := a.SeagullClient.GetPrivatePair(userId, "uploads", a.ShorelineClient.TokenProvide())
 	if group == nil {
 		return "", error_getting_permissons
 	}
@@ -314,8 +317,21 @@ func (a *Api) Query(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		//find the groupId
-		groupId, detailedErr := a.getGroupForQueriedUser(req, qd.GetMetaQueryId())
+		// Find the userId
+		userId, detailedErr := a.getUserIdForQueriedId(qd.GetMetaQueryId())
+		if detailedErr != nil {
+			jsonError(res, detailedErr, start)
+			return
+		}
+
+		// Can the authenticated user view the requested user data?
+		if !a.userCanViewData(td.UserID, userId) {
+			jsonError(res, error_no_view_permisson, start)
+			return
+		}
+
+		// Find the groupId
+		groupId, detailedErr := a.getGroupIdForUserId(userId)
 		if detailedErr != nil {
 			jsonError(res, detailedErr, start)
 			return

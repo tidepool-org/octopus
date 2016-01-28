@@ -262,6 +262,22 @@ func Test_Query_Unauthorized(t *testing.T) {
 	}
 }
 
+func Test_Query_Forbidden(t *testing.T) {
+
+	//query is valid
+	body := encodeQuery("METAQUERY WHERE userid IS 12d7bc90fa QUERY TYPE IN cbg, smbg SORT BY time AS Timestamp REVERSED")
+
+	req, _ := http.NewRequest("POST", "/", body)
+	req.Header.Set(SESSION_TOKEN, token_can_only_upload)
+	res := httptest.NewRecorder()
+
+	octo := initApiForTest()
+	octo.Query(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("Resp given [%d] expected [%d] ", res.Code, http.StatusForbidden)
+	}
+}
+
 func Test_Query_BadRequest(t *testing.T) {
 
 	//query will be invalid
