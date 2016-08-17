@@ -71,7 +71,7 @@ var (
 
 func initConfig(v SchemaVersion) *StoreConfig {
 	return &StoreConfig{
-		Connection:    &mongo.Config{ConnectionString: "mongodb://localhost/streams_test"},
+		Connection:    &mongo.Config{ConnectionString: "mongodb://localhost/data_test"},
 		SchemaVersion: v,
 	}
 }
