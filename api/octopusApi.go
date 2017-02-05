@@ -31,8 +31,8 @@ import (
 	commonClients "github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/shoreline"
 
-	"./../clients"
-	"./../model"
+	"../clients"
+	"../model"
 )
 
 const (
